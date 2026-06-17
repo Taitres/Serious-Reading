@@ -243,8 +243,8 @@ window.App = {
     var win = utools.createBrowserWindow(
       'reader.html',
       {
-        width: 600,
-        height: 800,
+        width: 520,
+        height: 780,
         title: '',
         transparent: true,
         frame: false,
@@ -252,6 +252,8 @@ window.App = {
         resizable: true,
         backgroundColor: '#00000000',
         skipTaskbar: true,
+        hasShadow: false,
+        thickFrame: false,
         webPreferences: {
           preload: 'reader_preload.js'
         }
