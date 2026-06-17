@@ -5,10 +5,41 @@ const https = require('https');
 window.services = {
   readFile: (filePath) => {
     try {
-      return fs.readFileSync(filePath, 'utf-8');
+      var buf = fs.readFileSync(filePath);
+      return window.services.decodeBuffer(buf);
     } catch (e) {
       return null;
     }
+  },
+  decodeBuffer: (buf) => {
+    if (window.services.isUtf8(buf)) return buf.toString('utf-8');
+    try {
+      var iconv = require('./node_modules/iconv-lite');
+      return iconv.decode(buf, 'gbk');
+    } catch (e2) {
+      return buf.toString('utf-8');
+    }
+  },
+  isUtf8: (buf) => {
+    var i = 0;
+    var len = buf.length;
+    while (i < len) {
+      var b = buf[i];
+      if (b < 0x80) { i++; continue; }
+      if ((b & 0xE0) === 0xC0) {
+        if (i + 1 >= len || (buf[i+1] & 0xC0) !== 0x80) return false;
+        i += 2;
+      } else if ((b & 0xF0) === 0xE0) {
+        if (i + 2 >= len || (buf[i+1] & 0xC0) !== 0x80 || (buf[i+2] & 0xC0) !== 0x80) return false;
+        i += 3;
+      } else if ((b & 0xF8) === 0xF0) {
+        if (i + 3 >= len || (buf[i+1] & 0xC0) !== 0x80 || (buf[i+2] & 0xC0) !== 0x80 || (buf[i+3] & 0xC0) !== 0x80) return false;
+        i += 4;
+      } else {
+        return false;
+      }
+    }
+    return true;
   },
   readEpub: function(filePath) {
     try {

@@ -11,31 +11,24 @@ window.Parser = {
     var chapters = [];
     var match;
     var lastIndex = 0;
+    var lastChapterEnd = 0;
     while ((match = chapterPattern.exec(content)) !== null) {
       if (chapters.length === 0 && match.index > 0) {
-        chapters.push({
-          title: '开篇',
-          content: content.substring(0, match.index).trim(),
-          index: 0
-        });
+        var preContent = content.substring(0, match.index).trim();
+        if (preContent.length > 0) {
+          chapters.push({ title: '开篇', content: preContent, index: 0 });
+        }
       } else if (chapters.length > 0) {
-        chapters[chapters.length - 1].content = content.substring(lastIndex, match.index).trim();
+        chapters[chapters.length - 1].content = content.substring(lastChapterEnd, match.index).trim();
       }
-      chapters.push({
-        title: match[0].trim(),
-        content: '',
-        index: chapters.length
-      });
-      lastIndex = match.index + match[0].length;
+      chapters.push({ title: match[0].trim(), content: '', index: chapters.length });
+      lastChapterEnd = match.index + match[0].length;
+      if (chapters.length > 5000) break;
     }
     if (chapters.length > 0) {
-      chapters[chapters.length - 1].content = content.substring(lastIndex).trim();
+      chapters[chapters.length - 1].content = content.substring(lastChapterEnd).trim();
     } else {
-      chapters.push({
-        title: '全文',
-        content: content.trim(),
-        index: 0
-      });
+      chapters.push({ title: '全文', content: content.trim(), index: 0 });
     }
     return {
       title: this._extractTitle(filePath),

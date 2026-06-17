@@ -14,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "adm-zip": "^0.5.17"
+    "adm-zip": "^0.5.17",
+    "iconv-lite": "^0.7.2"
   }
 }

@@ -1,6 +1,8 @@
 window.Reader = {
   _autoPageTimer: null,
   _scrollDebounceTimer: null,
+  _lastChapterListKey: '',
+  _chapterClickHandler: null,
   init: function() {
     this._bindEvents();
     this._bindSubInput();
@@ -27,19 +29,8 @@ window.Reader = {
         self._scrollDebounceTimer = setTimeout(function() {
           self._updateProgressBar();
           self._saveScrollPosition();
-        }, 200);
+        }, 300);
       });
-      readerContent.addEventListener('wheel', function(e) {
-        if (!e.ctrlKey) {
-          e.preventDefault();
-          var scrollAmount = readerContent.clientHeight * 0.85;
-          if (e.deltaY > 0) {
-            readerContent.scrollTop += scrollAmount;
-          } else {
-            readerContent.scrollTop -= scrollAmount;
-          }
-        }
-      }, { passive: false });
     }
     document.addEventListener('keydown', function(e) {
       if (e.key === 'PageDown') {
@@ -74,28 +65,42 @@ window.Reader = {
     }
     if (chapterList) {
       var chapters = ChapterManager.getChapterList();
-      var html = '';
-      chapters.forEach(function(ch) {
-        var cls = 'chapter-item' + (ch.level > 1 ? ' section' : '') + (ch.index === ChapterManager.getCurrentIndex() ? ' active' : '');
-        html += '<div class="' + cls + '" data-index="' + ch.index + '">' + ch.title + '</div>';
-      });
-      chapterList.innerHTML = html;
-      chapterList.querySelectorAll('.chapter-item').forEach(function(el) {
-        el.addEventListener('click', function() {
-          ChapterManager.setChapter(parseInt(this.dataset.index));
-          Reader.render();
+      var listKey = chapters.length + ':' + ChapterManager.getCurrentIndex();
+      if (this._lastChapterListKey !== listKey) {
+        this._lastChapterListKey = listKey;
+        var html = '';
+        chapters.forEach(function(ch) {
+          var cls = 'chapter-item' + (ch.level > 1 ? ' section' : '') + (ch.index === ChapterManager.getCurrentIndex() ? ' active' : '');
+          html += '<div class="' + cls + '" data-index="' + ch.index + '">' + ch.title + '</div>';
         });
-      });
+        chapterList.innerHTML = html;
+        if (this._chapterClickHandler) {
+          chapterList.removeEventListener('click', this._chapterClickHandler);
+        }
+        this._chapterClickHandler = function(e) {
+          var item = e.target.closest('.chapter-item');
+          if (item) {
+            ChapterManager.setChapter(parseInt(item.dataset.index));
+            Reader.render();
+          }
+        };
+        chapterList.addEventListener('click', this._chapterClickHandler);
+      } else {
+        var activeEl = chapterList.querySelector('.chapter-item.active');
+        if (activeEl) activeEl.classList.remove('active');
+        var newActive = chapterList.querySelector('.chapter-item[data-index="' + ChapterManager.getCurrentIndex() + '"]');
+        if (newActive) newActive.classList.add('active');
+      }
     }
     this._updateProgressBar();
   },
   _updateProgressBar: function() {
     var readerContent = document.getElementById('reader-content');
     var progressFill = document.getElementById('progress-fill');
-    if (readerContent && progressFill) {
+    if (readerContent && progressFill && readerContent.scrollHeight > readerContent.clientHeight) {
       var scrollPercent = readerContent.scrollTop / (readerContent.scrollHeight - readerContent.clientHeight) * 100;
       var chapterProgress = ChapterManager.getProgress();
-      var totalProgress = chapterProgress * 0.7 + scrollPercent * 0.3 / 100 * 70 + scrollPercent * 0.3;
+      var totalProgress = chapterProgress * 0.7 + scrollPercent * 0.3;
       progressFill.style.width = Math.min(totalProgress, 100) + '%';
     }
   },
