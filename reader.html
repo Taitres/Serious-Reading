@@ -14,13 +14,17 @@
 
     #container {
       width: 100vw; height: 100vh; position: relative;
-      border-radius: 6px; overflow: hidden;
+    }
+
+    #drag-zone {
+      position: absolute; top: 0; left: 0; right: 0; height: 28px;
+      -webkit-app-region: drag; z-index: 50;
     }
 
     #reader {
-      width: 100%; height: 100%; overflow-y: auto; padding: 28px 36px;
+      width: 100%; height: 100%; overflow-y: auto; padding: 32px 36px;
       font-size: 17px; line-height: 1.85; user-select: text;
-      color: rgba(0,0,0,0.82); -webkit-app-region: drag;
+      color: rgba(0,0,0,0.82);
     }
     #reader p { margin-bottom: 0.9em; text-indent: 2em; }
     #reader h1, #reader h2, #reader h3 { text-indent: 0; margin: 1em 0 0.5em; font-weight: 600; }
@@ -102,6 +106,7 @@
 </head>
 <body>
   <div id="container">
+    <div id="drag-zone"></div>
     <div id="bar">
       <button id="b-menu" title="章节">☰</button>
       <button id="b-pick" title="取色背景">🎨</button>
