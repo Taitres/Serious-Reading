@@ -172,9 +172,11 @@
 
       render: function() {
         var ch = ChapterManager.getCurrentChapter();
-        if (!ch) return;
+        if (!ch) { document.getElementById('reader').innerHTML = '<p style="color:#999;text-align:center;padding-top:40vh;">加载中...</p>'; return; }
         var r = document.getElementById('reader');
-        r.innerHTML = ChapterManager.renderChapterContent(ch);
+        var html = ChapterManager.renderChapterContent(ch);
+        if (!html || !html.trim()) { r.innerHTML = '<p style="color:#999;text-align:center;">本章节内容为空</p>'; return; }
+        r.innerHTML = html;
         r.scrollTop = 0;
         r.style.fontSize = this._fontSize + 'px';
         r.style.color = this._textColor;
@@ -297,18 +299,29 @@
       _recvState: function() {
         var ipcRenderer = require('electron').ipcRenderer;
         ipcRenderer.on('reading-state', function(event, state) {
-          if (!state.filePath) return;
+          if (!state || !state.filePath) return;
           var book = null;
           if (state.format === 'epub') {
-            book = window.services.readEpub(state.filePath);
+            if (window.services && window.services.readEpub) book = window.services.readEpub(state.filePath);
           } else {
-            var content = window.services.readFile(state.filePath);
-            if (content) book = Parser.parseFile(state.filePath, content);
+            if (window.services && window.services.readFile) {
+              var content = window.services.readFile(state.filePath);
+              if (content) book = Parser.parseFile(state.filePath, content);
+            }
           }
           if (book) {
             ChapterManager.load(book);
-            ChapterManager.setChapter(state.chapterIndex || 0);
+            var savedProgress = Storage.getBookProgress(state.filePath);
+            var chapterIdx = (savedProgress && savedProgress.chapterIndex) || state.chapterIndex || 0;
+            var scrollPos = (savedProgress && savedProgress.scrollPosition) || state.scrollPosition || 0;
+            ChapterManager.setChapter(chapterIdx);
             FR.render();
+            if (scrollPos > 0) {
+              var r = document.getElementById('reader');
+              if (r) setTimeout(function() { r.scrollTop = scrollPos; }, 150);
+            }
+          } else {
+            document.getElementById('reader').innerHTML = '<p style="color:#c66;text-align:center;padding-top:40vh;">无法加载文件<br><small>' + state.filePath + '</small></p>';
           }
         });
       },

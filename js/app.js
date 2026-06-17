@@ -46,7 +46,8 @@ window.App = {
     } else if (action.code === 'reader_open') {
       if (action.type === 'file' && action.payload && action.payload.length > 0) {
         var file = action.payload[0];
-        this._openBook(file.path, file.name.split('.').pop().toLowerCase());
+        var ext = (file.name || file.path).split('.').pop().toLowerCase();
+        this._openBook(file.path, ext);
       }
     }
   },
@@ -74,9 +75,17 @@ window.App = {
     }
     if (book) {
       ChapterManager.load(book);
+      var saved = Storage.getBookProgress(filePath);
+      if (saved && saved.chapterIndex) {
+        ChapterManager.setChapter(saved.chapterIndex);
+      }
       this._showView('reader');
       Reader.applySettings();
       Reader.render();
+      if (saved && saved.scrollPosition) {
+        var rc = document.getElementById('reader-content');
+        if (rc) setTimeout(function() { rc.scrollTop = saved.scrollPosition; }, 150);
+      }
     }
   },
   _openUrl: function(url) {
