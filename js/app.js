@@ -259,7 +259,7 @@ window.App = {
         frame: false,
         alwaysOnTop: true,
         resizable: true,
-        backgroundColor: '#00000000',
+        backgroundColor: '#02fafafa',
         skipTaskbar: true,
         hasShadow: false,
         thickFrame: false,

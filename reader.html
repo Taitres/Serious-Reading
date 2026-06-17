@@ -7,13 +7,14 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      background: transparent; overflow: hidden;
+      background: rgba(255,255,255,0.01); overflow: hidden;
       height: 100vh; width: 100vw;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Roboto, sans-serif;
     }
 
     #container {
       width: 100vw; height: 100vh; position: relative;
+      background: rgba(245,245,245,0.92);
     }
 
     #drag-zone {
@@ -24,9 +25,9 @@
     #reader {
       width: 100%; height: 100%; overflow-y: auto; padding: 32px 36px;
       font-size: 17px; line-height: 1.85; user-select: text;
-      color: rgba(0,0,0,0.82);
+      color: #222;
     }
-    #reader p { margin-bottom: 0.9em; text-indent: 2em; }
+    #reader p { margin-bottom: 0.9em; text-indent: 2em; word-break: break-all; }
     #reader h1, #reader h2, #reader h3 { text-indent: 0; margin: 1em 0 0.5em; font-weight: 600; }
 
     #bar {
@@ -168,6 +169,33 @@
         this._applyBg();
         this._bindAll();
         this._recvState();
+        setTimeout(function() {
+          if (!ChapterManager.getBook()) {
+            var history = Storage.getReadingHistory();
+            if (history.length > 0) {
+              var last = history[0];
+              var book = null;
+              if (last.format === 'epub') {
+                if (window.services && window.services.readEpub) book = window.services.readEpub(last.filePath);
+              } else {
+                if (window.services && window.services.readFile) {
+                  var content = window.services.readFile(last.filePath);
+                  if (content) book = Parser.parseFile(last.filePath, content);
+                }
+              }
+              if (book) {
+                var saved = Storage.getBookProgress(last.filePath);
+                ChapterManager.load(book);
+                if (saved && saved.chapterIndex) ChapterManager.setChapter(saved.chapterIndex);
+                FR.render();
+                if (saved && saved.scrollPosition) {
+                  var r = document.getElementById('reader');
+                  if (r) setTimeout(function() { r.scrollTop = saved.scrollPosition; }, 200);
+                }
+              }
+            }
+          }
+        }, 500);
       },
 
       render: function() {
@@ -193,7 +221,7 @@
         } else if (this._bgColor) {
           c.style.background = this._bgColor;
         } else {
-          c.style.background = 'rgba(245,245,245,0.88)';
+          c.style.background = 'rgba(245,245,245,0.92)';
         }
         this._textColor = this._calcText(this._bgColor);
         var r = document.getElementById('reader');
