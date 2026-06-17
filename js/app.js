@@ -230,33 +230,35 @@ window.App = {
   _popoutWindow: function() {
     if (typeof utools === 'undefined' || !utools.createBrowserWindow) return;
     var book = ChapterManager.getBook();
+    if (!book) { alert('请先打开一本书'); return; }
     var currentChapter = ChapterManager.getCurrentIndex();
     var settings = Storage.getSettings();
     var state = {
-      filePath: book ? book.filePath : '',
-      format: book ? book.format : '',
+      filePath: book.filePath,
+      format: book.format,
       chapterIndex: currentChapter,
       scrollPosition: document.getElementById('reader-content') ? document.getElementById('reader-content').scrollTop : 0,
-      disguiseMode: Disguise.getMode(),
-      isDisguised: Disguise.isDisguised(),
       settings: settings
     };
     var win = utools.createBrowserWindow(
       'reader.html',
       {
-        width: 800,
-        height: 600,
-        title: 'Serious Reading',
+        width: 600,
+        height: 800,
+        title: '',
         transparent: true,
         frame: false,
         alwaysOnTop: true,
+        resizable: true,
         backgroundColor: '#00000000',
+        skipTaskbar: true,
         webPreferences: {
           preload: 'reader_preload.js'
         }
       },
       function() {
         win.webContents.send('reading-state', state);
+        try { win.setAlwaysOnTop(true, 'screen-saver'); } catch(e) {}
       }
     );
   }

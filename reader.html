@@ -6,163 +6,478 @@
   <title>Serious Reading</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/reader.css">
-  <link rel="stylesheet" href="css/disguises/vscode.css">
-  <link rel="stylesheet" href="css/disguises/excel.css">
-  <link rel="stylesheet" href="css/disguises/outlook.css">
-  <link rel="stylesheet" href="css/disguises/terminal.css">
   <style>
-    body { background: transparent; }
-    .window-drag-area {
-      -webkit-app-region: drag; height: 32px; background: var(--bg-secondary);
-      display: flex; align-items: center; padding: 0 8px; gap: 8px;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: transparent; overflow: hidden; height: 100vh; width: 100vw; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #333; }
+
+    #floating-container {
+      width: 100vw; height: 100vh; display: flex; flex-direction: column;
+      position: relative; border-radius: 8px; overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
     }
-    .window-drag-area button { -webkit-app-region: no-drag; }
-    .window-controls { margin-left: auto; display: flex; gap: 4px; }
-    .window-controls button {
-      width: 28px; height: 28px; display: flex; align-items: center;
-      justify-content: center; background: transparent; color: var(--text-secondary);
-      border-radius: 4px; font-size: 14px;
+
+    #float-toolbar {
+      -webkit-app-region: drag; height: 36px; display: flex; align-items: center;
+      padding: 0 10px; gap: 6px; flex-shrink: 0; background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-    .window-controls button:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+    #float-toolbar button {
+      -webkit-app-region: no-drag; background: transparent; color: rgba(255,255,255,0.8);
+      border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 13px; transition: background 0.15s, color 0.15s;
+    }
+    #float-toolbar button:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    #float-toolbar .toolbar-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.15); }
+    #float-toolbar .toolbar-title { color: rgba(255,255,255,0.6); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .window-controls { margin-left: auto; display: flex; gap: 2px; -webkit-app-region: no-drag; }
+    .window-controls button { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; font-size: 14px; border-radius: 4px; }
     .window-controls .close-btn:hover { background: #e81123; color: #fff; }
-    #reader-view { height: calc(100vh - 32px); }
+
+    #float-reader {
+      flex: 1; overflow-y: auto; padding: 24px 32px; background: transparent;
+      font-size: 16px; line-height: 1.8; user-select: text; min-height: 0;
+    }
+    #float-reader p { margin-bottom: 1em; text-indent: 2em; }
+    #float-reader h1, #float-reader h2, #float-reader h3 { text-indent: 0; margin: 1em 0 0.5em; font-weight: 600; }
+
+    #float-progress { height: 3px; background: rgba(0,0,0,0.1); flex-shrink: 0; }
+    #float-progress-fill { height: 100%; background: rgba(0,0,0,0.35); width: 0%; transition: width 0.2s; }
+
+    #float-chapter-panel {
+      position: absolute; left: 0; top: 36px; bottom: 3px; width: 220px;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      overflow-y: auto; z-index: 10; transform: translateX(-100%);
+      transition: transform 0.2s ease; border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    #float-chapter-panel.open { transform: translateX(0); }
+    .fc-item {
+      padding: 6px 14px; font-size: 13px; color: rgba(255,255,255,0.6);
+      cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: color 0.15s, background 0.15s;
+    }
+    .fc-item:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.08); }
+    .fc-item.active { color: #fff; background: rgba(255,255,255,0.12); }
+
+    #color-bar {
+      position: absolute; right: 0; top: 36px; bottom: 3px; width: 180px;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      overflow-y: auto; z-index: 10; transform: translateX(100%);
+      transition: transform 0.2s ease; border-left: 1px solid rgba(255,255,255,0.08);
+      padding: 12px;
+    }
+    #color-bar.open { transform: translateX(0); }
+    .cb-label { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 8px; }
+    .cb-btn {
+      display: block; width: 100%; padding: 8px; margin-bottom: 6px;
+      background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8);
+      border: none; border-radius: 4px; cursor: pointer; font-size: 13px; text-align: left;
+    }
+    .cb-btn:hover { background: rgba(255,255,255,0.2); }
+    .cb-swatch {
+      display: inline-block; width: 16px; height: 16px; border-radius: 3px;
+      margin-right: 6px; vertical-align: middle; border: 1px solid rgba(255,255,255,0.2);
+    }
+    .cb-opacity-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .cb-opacity-row label { font-size: 12px; color: rgba(255,255,255,0.5); min-width: 40px; }
+    .cb-opacity-row input[type="range"] { flex: 1; }
+    .cb-opacity-row span { font-size: 12px; color: rgba(255,255,255,0.6); min-width: 30px; }
+    .cb-saved { margin-top: 12px; }
+    .cb-saved-item {
+      display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+      cursor: pointer; border-radius: 4px; margin-bottom: 3px;
+    }
+    .cb-saved-item:hover { background: rgba(255,255,255,0.1); }
+    .cb-saved-item .cb-swatch { margin-right: 0; }
+    .cb-saved-item span { font-size: 12px; color: rgba(255,255,255,0.6); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cb-saved-item .cb-del { font-size: 11px; color: rgba(255,255,255,0.3); cursor: pointer; }
+    .cb-saved-item .cb-del:hover { color: #e81123; }
   </style>
 </head>
 <body>
-  <div class="window-drag-area">
-    <span id="window-title" style="font-size: 12px; color: var(--text-secondary);">Serious Reading</span>
-    <div class="window-controls">
-      <button id="btn-minimize" title="最小化">─</button>
-      <button id="btn-always-top" title="置顶">📌</button>
-      <button id="btn-close" class="close-btn" title="关闭">✕</button>
-    </div>
-  </div>
-  <div id="app">
-    <div id="reader-view" class="view">
-      <div id="chapter-sidebar">
-        <div id="chapter-list"></div>
-      </div>
-      <div id="reader-main">
-        <div id="reader-toolbar">
-          <button id="btn-toggle-sidebar" title="目录">☰</button>
-          <span id="book-title"></span>
-          <span id="chapter-progress"></span>
-          <button id="btn-disguise" title="伪装">🎭</button>
-          <button id="btn-settings" title="设置">⚙</button>
-        </div>
-        <div id="reader-content"></div>
-        <div id="reader-progress-bar"><div id="progress-fill"></div></div>
+  <div id="floating-container">
+    <div id="float-toolbar">
+      <button id="btn-chapters" title="章节目录">☰</button>
+      <span id="float-title" class="toolbar-title"></span>
+      <span id="float-progress-text" style="font-size:11px;color:rgba(255,255,255,0.4);flex-shrink:0;"></span>
+      <div class="toolbar-sep"></div>
+      <button id="btn-pick-color" title="取色设置背景">🎨</button>
+      <button id="btn-capture-bg" title="截图设置背景">📷</button>
+      <button id="btn-prev-ch" title="上一章">◀</button>
+      <button id="btn-next-ch" title="下一章">▶</button>
+      <div class="window-controls">
+        <button id="btn-pin" title="置顶">📌</button>
+        <button id="btn-minimize" title="最小化">─</button>
+        <button id="btn-close" class="close-btn" title="关闭">✕</button>
       </div>
     </div>
+    <div id="float-chapter-panel"></div>
+    <div id="color-bar">
+      <div class="cb-label">背景设置</div>
+      <button class="cb-btn" id="cb-pick">🎨 取色器选色</button>
+      <button class="cb-btn" id="cb-capture">📷 截图做背景</button>
+      <button class="cb-btn" id="cb-reset">↩ 恢复默认</button>
+      <div class="cb-opacity-row">
+        <label>透明度</label>
+        <input type="range" id="cb-opacity" min="0.1" max="1" step="0.05" value="1">
+        <span id="cb-opacity-val">100%</span>
+      </div>
+      <div class="cb-opacity-row">
+        <label>模糊</label>
+        <input type="range" id="cb-blur" min="0" max="20" step="1" value="0">
+        <span id="cb-blur-val">0</span>
+      </div>
+      <div class="cb-saved" id="cb-saved-list"></div>
+    </div>
+    <div id="float-reader"></div>
+    <div id="float-progress"><div id="float-progress-fill"></div></div>
   </div>
+
   <script src="js/storage.js"></script>
   <script src="js/parser.js"></script>
   <script src="js/chapter.js"></script>
-  <script src="js/disguise.js"></script>
-  <script src="js/colorpicker.js"></script>
   <script src="js/stealth.js"></script>
-  <script src="js/reader.js"></script>
   <script>
     var remote;
     try { remote = require('@electron/remote'); } catch(e) {}
 
-    document.addEventListener('DOMContentLoaded', function() {
-      Storage;
-      ChapterManager;
-      Disguise.init();
-      ColorPicker.init();
-      Stealth.init();
-      Reader.init();
+    var FloatReader = {
+      _bgColor: null,
+      _bgImage: null,
+      _opacity: 1.0,
+      _blur: 0,
+      _textColor: '#333',
+      _isPinned: true,
+      _chapterPanelOpen: false,
+      _colorBarOpen: false,
 
-      var btnMinimize = document.getElementById('btn-minimize');
-      var btnAlwaysTop = document.getElementById('btn-always-top');
-      var btnClose = document.getElementById('btn-close');
-      var btnDisguise = document.getElementById('btn-disguise');
-      var btnSettings = document.getElementById('btn-settings');
-      var btnSidebar = document.getElementById('btn-toggle-sidebar');
+      init: function() {
+        Storage;
+        ChapterManager;
+        Stealth.init();
+        this._bindToolbar();
+        this._bindKeyboard();
+        this._bindScrollProgress();
+        this._loadSavedBg();
+        this._applyBg();
 
-      if (btnMinimize) {
-        btnMinimize.addEventListener('click', function() {
-          if (remote) {
-            var win = remote.getCurrentWindow();
-            win.minimize();
+        var ipcRenderer = require('electron').ipcRenderer;
+        ipcRenderer.on('reading-state', function(event, state) {
+          if (state.filePath && state.format) {
+            var book = null;
+            if (state.format === 'epub') {
+              book = window.services.readEpub(state.filePath);
+            } else {
+              var content = window.services.readFile(state.filePath);
+              if (content) book = Parser.parseFile(state.filePath, content);
+            }
+            if (book) {
+              ChapterManager.load(book);
+              ChapterManager.setChapter(state.chapterIndex || 0);
+              FloatReader.render();
+            }
           }
         });
-      }
+      },
 
-      var isAlwaysOnTop = true;
-      if (btnAlwaysTop) {
-        btnAlwaysTop.addEventListener('click', function() {
-          isAlwaysOnTop = !isAlwaysOnTop;
-          if (remote) {
-            var win = remote.getCurrentWindow();
-            win.setAlwaysOnTop(isAlwaysOnTop);
+      render: function() {
+        var chapter = ChapterManager.getCurrentChapter();
+        if (!chapter) return;
+        var content = ChapterManager.renderChapterContent(chapter);
+        var reader = document.getElementById('float-reader');
+        if (reader) {
+          reader.innerHTML = content;
+          reader.scrollTop = 0;
+          reader.style.opacity = this._opacity;
+          reader.style.color = this._textColor;
+          if (this._blur > 0) {
+            reader.style.backdropFilter = 'blur(' + this._blur + 'px)';
+            reader.style.webkitBackdropFilter = 'blur(' + this._blur + 'px)';
+          } else {
+            reader.style.backdropFilter = '';
+            reader.style.webkitBackdropFilter = '';
           }
-          this.textContent = isAlwaysOnTop ? '📌' : '📍';
-        });
-      }
+        }
+        this._updateTitle();
+        this._updateChapterPanel();
+        this._saveProgress();
+      },
 
-      if (btnClose) {
-        btnClose.addEventListener('click', function() {
+      _updateTitle: function() {
+        var title = document.getElementById('float-title');
+        var progress = document.getElementById('float-progress-text');
+        var book = ChapterManager.getBook();
+        var ch = ChapterManager.getCurrentChapter();
+        if (title && book) title.textContent = book.title;
+        if (progress && book && ch) {
+          progress.textContent = (ch.index + 1) + '/' + book.totalChapters;
+        }
+      },
+
+      _updateChapterPanel: function() {
+        var panel = document.getElementById('float-chapter-panel');
+        if (!panel) return;
+        var chapters = ChapterManager.getChapterList();
+        var html = '';
+        var currentIdx = ChapterManager.getCurrentIndex();
+        chapters.forEach(function(ch) {
+          html += '<div class="fc-item' + (ch.index === currentIdx ? ' active' : '') + '" data-index="' + ch.index + '">' + ch.title + '</div>';
+        });
+        panel.innerHTML = html;
+        panel.addEventListener('click', function(e) {
+          var item = e.target.closest('.fc-item');
+          if (item) {
+            ChapterManager.setChapter(parseInt(item.dataset.index));
+            FloatReader.render();
+          }
+        });
+      },
+
+      _applyBg: function() {
+        var container = document.getElementById('floating-container');
+        if (!container) return;
+        if (this._bgImage) {
+          container.style.background = 'url(' + this._bgImage + ') center/cover no-repeat';
+        } else if (this._bgColor) {
+          container.style.background = this._bgColor;
+        } else {
+          container.style.background = 'rgba(255,255,255,0.92)';
+          this._textColor = '#333';
+        }
+        if (this._bgColor || this._bgImage) {
+          this._textColor = this._calcTextColor(this._bgColor || '#888888');
+        }
+        var reader = document.getElementById('float-reader');
+        if (reader) {
+          reader.style.color = this._textColor;
+          reader.style.opacity = this._opacity;
+        }
+        this._updateSavedList();
+      },
+
+      _calcTextColor: function(hex) {
+        if (!hex) return '#333';
+        var clean = hex.replace('#', '');
+        if (clean.length < 6) return '#333';
+        var r = parseInt(clean.substring(0, 2), 16);
+        var g = parseInt(clean.substring(2, 4), 16);
+        var b = parseInt(clean.substring(4, 6), 16);
+        var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return lum > 0.5 ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
+      },
+
+      _pickColor: function() {
+        if (typeof utools !== 'undefined' && utools.screenColorPick) {
+          utools.screenColorPick(function(colors) {
+            FloatReader._bgColor = colors.hex;
+            FloatReader._bgImage = null;
+            FloatReader._applyBg();
+            FloatReader._saveBgToStorage();
+            FloatReader.render();
+          });
+        }
+      },
+
+      _captureBg: function() {
+        if (typeof utools !== 'undefined' && utools.screenCapture) {
+          utools.screenCapture(function(image) {
+            FloatReader._bgImage = image;
+            FloatReader._bgColor = null;
+            FloatReader._applyBg();
+            FloatReader._saveBgToStorage();
+            FloatReader.render();
+          });
+        }
+      },
+
+      _resetBg: function() {
+        this._bgColor = null;
+        this._bgImage = null;
+        this._opacity = 1.0;
+        this._blur = 0;
+        document.getElementById('cb-opacity').value = 1;
+        document.getElementById('cb-opacity-val').textContent = '100%';
+        document.getElementById('cb-blur').value = 0;
+        document.getElementById('cb-blur-val').textContent = '0';
+        this._applyBg();
+        this.render();
+        this._saveBgToStorage();
+      },
+
+      _saveBgToStorage: function() {
+        var settings = Storage.getSettings();
+        settings.floatBg = { bgColor: this._bgColor, bgImage: this._bgImage ? 'saved' : null, opacity: this._opacity, blur: this._blur };
+        Storage.saveSettings(settings);
+      },
+
+      _loadSavedBg: function() {
+        var settings = Storage.getSettings();
+        if (settings.floatBg) {
+          this._bgColor = settings.floatBg.bgColor || null;
+          this._bgImage = settings.floatBg.bgImage || null;
+          this._opacity = settings.floatBg.opacity || 1.0;
+          this._blur = settings.floatBg.blur || 0;
+          document.getElementById('cb-opacity').value = this._opacity;
+          document.getElementById('cb-opacity-val').textContent = Math.round(this._opacity * 100) + '%';
+          document.getElementById('cb-blur').value = this._blur;
+          document.getElementById('cb-blur-val').textContent = this._blur;
+        }
+      },
+
+      _updateSavedList: function() {
+        var list = document.getElementById('cb-saved-list');
+        if (!list) return;
+        var schemes = Storage.getColorSchemes();
+        if (schemes.length === 0) { list.innerHTML = ''; return; }
+        var html = '<div class="cb-label">已保存方案</div>';
+        schemes.forEach(function(s, i) {
+          var swatchStyle = s.bgColor ? 'background:' + s.bgColor : 'background:linear-gradient(135deg,#667eea,#764ba2)';
+          html += '<div class="cb-saved-item" data-index="' + i + '">';
+          html += '<span class="cb-swatch" style="' + swatchStyle + '"></span>';
+          html += '<span>' + (s.name || s.bgColor || '截图') + '</span>';
+          html += '<span class="cb-del" data-del="' + i + '">✕</span>';
+          html += '</div>';
+        });
+        list.innerHTML = html;
+        list.querySelectorAll('.cb-saved-item').forEach(function(el) {
+          el.addEventListener('click', function(e) {
+            if (e.target.classList.contains('cb-del')) {
+              var idx = parseInt(e.target.dataset.del);
+              Storage.getColorSchemes().splice(idx, 1);
+              var schemes = Storage.getColorSchemes();
+              schemes.splice(idx, 1);
+              Storage.saveColorSchemes(schemes);
+              FloatReader._updateSavedList();
+              return;
+            }
+            var idx = parseInt(this.dataset.index);
+            var schemes = Storage.getColorSchemes();
+            if (schemes[idx]) {
+              FloatReader._bgColor = schemes[idx].bgColor || null;
+              FloatReader._bgImage = schemes[idx].bgImage || null;
+              FloatReader._applyBg();
+              FloatReader.render();
+            }
+          });
+        });
+      },
+
+      _bindToolbar: function() {
+        var self = this;
+        document.getElementById('btn-chapters').addEventListener('click', function() {
+          self._chapterPanelOpen = !self._chapterPanelOpen;
+          document.getElementById('float-chapter-panel').classList.toggle('open', self._chapterPanelOpen);
+          if (self._chapterPanelOpen) self._updateChapterPanel();
+        });
+        document.getElementById('btn-pick-color').addEventListener('click', function() { self._pickColor(); });
+        document.getElementById('btn-capture-bg').addEventListener('click', function() { self._captureBg(); });
+        document.getElementById('cb-pick').addEventListener('click', function() { self._pickColor(); });
+        document.getElementById('cb-capture').addEventListener('click', function() { self._captureBg(); });
+        document.getElementById('cb-reset').addEventListener('click', function() { self._resetBg(); });
+
+        document.getElementById('btn-pick-color').addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          self._colorBarOpen = !self._colorBarOpen;
+          document.getElementById('color-bar').classList.toggle('open', self._colorBarOpen);
+          self._updateSavedList();
+        });
+
+        document.getElementById('cb-opacity').addEventListener('input', function() {
+          self._opacity = parseFloat(this.value);
+          document.getElementById('cb-opacity-val').textContent = Math.round(self._opacity * 100) + '%';
+          var reader = document.getElementById('float-reader');
+          if (reader) reader.style.opacity = self._opacity;
+          self._saveBgToStorage();
+        });
+        document.getElementById('cb-blur').addEventListener('input', function() {
+          self._blur = parseInt(this.value);
+          document.getElementById('cb-blur-val').textContent = self._blur;
+          self.render();
+          self._saveBgToStorage();
+        });
+
+        document.getElementById('btn-prev-ch').addEventListener('click', function() {
+          if (ChapterManager.prevChapter()) self.render();
+        });
+        document.getElementById('btn-next-ch').addEventListener('click', function() {
+          if (ChapterManager.nextChapter()) self.render();
+        });
+
+        document.getElementById('btn-pin').addEventListener('click', function() {
+          self._isPinned = !self._isPinned;
+          if (remote) remote.getCurrentWindow().setAlwaysOnTop(self._isPinned);
+          this.textContent = self._isPinned ? '📌' : '📍';
+        });
+        document.getElementById('btn-minimize').addEventListener('click', function() {
+          if (remote) remote.getCurrentWindow().minimize();
+        });
+        document.getElementById('btn-close').addEventListener('click', function() {
           utools.sendToParent('close-reader', {
             chapterIndex: ChapterManager.getCurrentIndex(),
-            scrollPosition: document.getElementById('reader-content') ? document.getElementById('reader-content').scrollTop : 0
+            scrollPosition: document.getElementById('float-reader') ? document.getElementById('float-reader').scrollTop : 0
           });
           window.close();
         });
-      }
+      },
 
-      if (btnDisguise) {
-        btnDisguise.addEventListener('click', function() {
-          Disguise.toggle();
-          if (!Disguise.isDisguised()) Reader.render();
-        });
-      }
-
-      if (btnSettings) {
-        btnSettings.addEventListener('click', function() {
-          if (typeof App !== 'undefined' && App._showSettingsPanel) {
-            App._showSettingsPanel();
-          }
-        });
-      }
-
-      if (btnSidebar) {
-        btnSidebar.addEventListener('click', function() {
-          document.getElementById('chapter-sidebar').classList.toggle('collapsed');
-        });
-      }
-
-      var ipcRenderer = require('electron').ipcRenderer;
-      ipcRenderer.on('reading-state', function(event, state) {
-        if (state.filePath && state.format) {
-          if (state.format === 'epub') {
-            var book = window.services.readEpub(state.filePath);
-            if (book) {
-              ChapterManager.load(book);
-              Reader.applySettings();
-              Reader.render();
-              ChapterManager.setChapter(state.chapterIndex || 0);
-              Reader.render();
+      _bindKeyboard: function() {
+        var self = this;
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') {
+            if (self._chapterPanelOpen) {
+              self._chapterPanelOpen = false;
+              document.getElementById('float-chapter-panel').classList.remove('open');
+              return;
             }
-          } else {
-            var content = window.services.readFile(state.filePath);
-            if (content) {
-              var book = Parser.parseFile(state.filePath, content);
-              if (book) {
-                ChapterManager.load(book);
-                Reader.applySettings();
-                ChapterManager.setChapter(state.chapterIndex || 0);
-                Reader.render();
-              }
+            if (self._colorBarOpen) {
+              self._colorBarOpen = false;
+              document.getElementById('color-bar').classList.remove('open');
+              return;
             }
           }
-        }
-        if (state.isDisguised) {
-          Disguise.setMode(state.disguiseMode);
-          Disguise.show();
-        }
-      });
+          if (e.key === 'ArrowLeft' && e.altKey) {
+            if (ChapterManager.prevChapter()) self.render();
+            e.preventDefault();
+          }
+          if (e.key === 'ArrowRight' && e.altKey) {
+            if (ChapterManager.nextChapter()) self.render();
+            e.preventDefault();
+          }
+        });
+      },
+
+      _bindScrollProgress: function() {
+        var reader = document.getElementById('float-reader');
+        var fill = document.getElementById('float-progress-fill');
+        if (!reader || !fill) return;
+        reader.addEventListener('scroll', function() {
+          if (reader.scrollHeight <= reader.clientHeight) return;
+          var pct = reader.scrollTop / (reader.scrollHeight - reader.clientHeight) * 100;
+          fill.style.width = pct + '%';
+        });
+      },
+
+      _saveProgress: function() {
+        var book = ChapterManager.getBook();
+        if (!book) return;
+        Storage.saveBookProgress(book.filePath, {
+          chapterIndex: ChapterManager.getCurrentIndex(),
+          scrollPosition: 0,
+          timestamp: Date.now()
+        });
+        Storage.addRecentBook({
+          filePath: book.filePath,
+          title: book.title,
+          format: book.format,
+          lastChapter: ChapterManager.getCurrentIndex(),
+          lastRead: Date.now()
+        });
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+      FloatReader.init();
     });
   </script>
 </body>
