@@ -1,0 +1,15 @@
+body.disguised.disguise-outlook #reader-view { background: #ffffff; }
+body.disguised.disguise-outlook #chapter-sidebar { display: none; }
+body.disguised.disguise-outlook #reader-toolbar { background: #0078d4; border-color: #006cbd; }
+body.disguised.disguise-outlook #reader-toolbar button { color: #ffffff; }
+body.disguised.disguise-outlook #reader-toolbar span { color: #ffffff; }
+.outlook-layout { display: flex; height: 100%; }
+.outlook-mail-list { width: 250px; border-right: 1px solid #e0e0e0; overflow-y: auto; background: #fafafa; }
+.outlook-mail-item { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; font-size: 13px; }
+.outlook-mail-item:hover { background: #f0f0f0; }
+.outlook-mail-item.active { background: #e8f0fe; border-left: 3px solid #0078d4; }
+.outlook-mail-from { font-weight: 600; color: #333; }
+.outlook-mail-preview { font-size: 12px; color: #666; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outlook-mail-body { flex: 1; padding: 16px; overflow-y: auto; }
+.outlook-mail-header { padding-bottom: 12px; border-bottom: 1px solid #e0e0e0; margin-bottom: 12px; font-size: 13px; color: #666; }
+.outlook-mail-content p { text-indent: 0; margin-bottom: 0.8em; }

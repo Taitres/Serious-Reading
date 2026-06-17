@@ -1,0 +1,9 @@
+body.disguised.disguise-terminal #reader-view { background: #0c0c0c; }
+body.disguised.disguise-terminal #chapter-sidebar { display: none; }
+body.disguised.disguise-terminal #reader-toolbar { background: #0c0c0c; border-color: #333; }
+body.disguised.disguise-terminal #reader-toolbar button { color: #00ff00; }
+body.disguised.disguise-terminal #reader-toolbar span { color: #00ff00; }
+body.disguised.disguise-terminal #reader-progress-bar { background: #333; }
+.terminal-output { width: 100%; }
+.terminal-cmd { color: #00ff00; font-family: "Cascadia Code", "Consolas", monospace; font-size: 13px; margin-bottom: 8px; }
+.terminal-text { color: #cccccc; font-family: "Cascadia Code", "Consolas", monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; margin: 0; }

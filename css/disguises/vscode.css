@@ -1,0 +1,11 @@
+body.disguised.disguise-vscode #reader-view { background: #1e1e1e; }
+body.disguised.disguise-vscode #chapter-sidebar { display: none; }
+body.disguised.disguise-vscode #reader-toolbar { background: #323233; border-color: #252526; }
+body.disguised.disguise-vscode #reader-toolbar button { color: #cccccc; }
+.vscode-editor { width: 100%; height: 100%; }
+.vscode-tabs { display: flex; background: #2d2d2d; border-bottom: 1px solid #252526; padding: 0; height: 35px; align-items: flex-end; }
+.vscode-tab { padding: 6px 16px; background: #1e1e1e; color: #ffffff; font-size: 13px; border-top: 2px solid #007acc; font-family: -apple-system, "Segoe UI", sans-serif; }
+.vscode-line { display: flex; min-height: 20px; }
+.vscode-ln { width: 50px; text-align: right; padding-right: 16px; color: #858585; flex-shrink: 0; font-size: 13px; }
+.vscode-code { flex: 1; color: #d4d4d4; white-space: pre-wrap; word-break: break-all; }
+.vscode-statusbar { position: absolute; bottom: 0; left: 0; right: 0; background: #007acc; color: #fff; font-size: 12px; padding: 0 12px; height: 22px; display: flex; align-items: center; justify-content: space-between; font-family: -apple-system, "Segoe UI", sans-serif; }
