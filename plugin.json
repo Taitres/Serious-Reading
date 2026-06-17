@@ -1,0 +1,37 @@
+{
+  "main": "index.html",
+  "logo": "logo.svg",
+  "preload": "preload.js",
+  "pluginSetting": {
+    "single": true,
+    "height": 500
+  },
+  "features": [
+    {
+      "code": "reader",
+      "explain": "隐蔽阅读器",
+      "cmds": ["阅读", "看书", "serious"]
+    },
+    {
+      "code": "reader_continue",
+      "explain": "继续阅读",
+      "cmds": ["继续阅读", "阅读 继续"]
+    },
+    {
+      "code": "reader_stealth",
+      "explain": "切换伪装模式",
+      "cmds": ["阅读 隐藏", "老板来了"]
+    },
+    {
+      "code": "reader_open",
+      "explain": "打开文件阅读",
+      "cmds": [
+        {
+          "type": "files",
+          "label": "阅读文件",
+          "extensions": ["txt", "epub", "md", "markdown"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serious Reading</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/reader.css">
+  <link rel="stylesheet" href="css/disguises/vscode.css">
+  <link rel="stylesheet" href="css/disguises/excel.css">
+  <link rel="stylesheet" href="css/disguises/outlook.css">
+  <link rel="stylesheet" href="css/disguises/terminal.css">
+</head>
+<body>
+  <div id="app">
+    <div id="welcome" class="view">
+      <h2>Serious Reading</h2>
+      <p>隐蔽阅读器</p>
+      <div class="welcome-actions">
+        <button id="btn-open-file">打开文件</button>
+        <button id="btn-open-url">输入网址</button>
+        <button id="btn-continue" style="display:none">继续阅读</button>
+      </div>
+      <div id="recent-list"></div>
+    </div>
+    <div id="reader-view" class="view" style="display:none">
+      <div id="chapter-sidebar">
+        <div id="chapter-list"></div>
+      </div>
+      <div id="reader-main">
+        <div id="reader-toolbar">
+          <button id="btn-toggle-sidebar" title="目录">☰</button>
+          <span id="book-title"></span>
+          <span id="chapter-progress"></span>
+          <button id="btn-disguise" title="伪装">🎭</button>
+          <button id="btn-settings" title="设置">⚙</button>
+          <button id="btn-popout" title="弹出窗口">↗</button>
+        </div>
+        <div id="reader-content"></div>
+        <div id="reader-progress-bar">
+          <div id="progress-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="js/storage.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/chapter.js"></script>
+  <script src="js/disguise.js"></script>
+  <script src="js/colorpicker.js"></script>
+  <script src="js/stealth.js"></script>
+  <script src="js/reader.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
