@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serious Reading</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/reader.css">
+  <link rel="stylesheet" href="css/disguises/vscode.css">
+  <link rel="stylesheet" href="css/disguises/excel.css">
+  <link rel="stylesheet" href="css/disguises/outlook.css">
+  <link rel="stylesheet" href="css/disguises/terminal.css">
+  <style>
+    body { background: transparent; }
+    .window-drag-area {
+      -webkit-app-region: drag; height: 32px; background: var(--bg-secondary);
+      display: flex; align-items: center; padding: 0 8px; gap: 8px;
+    }
+    .window-drag-area button { -webkit-app-region: no-drag; }
+    .window-controls { margin-left: auto; display: flex; gap: 4px; }
+    .window-controls button {
+      width: 28px; height: 28px; display: flex; align-items: center;
+      justify-content: center; background: transparent; color: var(--text-secondary);
+      border-radius: 4px; font-size: 14px;
+    }
+    .window-controls button:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+    .window-controls .close-btn:hover { background: #e81123; color: #fff; }
+    #reader-view { height: calc(100vh - 32px); }
+  </style>
+</head>
+<body>
+  <div class="window-drag-area">
+    <span id="window-title" style="font-size: 12px; color: var(--text-secondary);">Serious Reading</span>
+    <div class="window-controls">
+      <button id="btn-minimize" title="最小化">─</button>
+      <button id="btn-always-top" title="置顶">📌</button>
+      <button id="btn-close" class="close-btn" title="关闭">✕</button>
+    </div>
+  </div>
+  <div id="app">
+    <div id="reader-view" class="view">
+      <div id="chapter-sidebar">
+        <div id="chapter-list"></div>
+      </div>
+      <div id="reader-main">
+        <div id="reader-toolbar">
+          <button id="btn-toggle-sidebar" title="目录">☰</button>
+          <span id="book-title"></span>
+          <span id="chapter-progress"></span>
+          <button id="btn-disguise" title="伪装">🎭</button>
+          <button id="btn-settings" title="设置">⚙</button>
+        </div>
+        <div id="reader-content"></div>
+        <div id="reader-progress-bar"><div id="progress-fill"></div></div>
+      </div>
+    </div>
+  </div>
+  <script src="js/storage.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/chapter.js"></script>
+  <script src="js/disguise.js"></script>
+  <script src="js/colorpicker.js"></script>
+  <script src="js/stealth.js"></script>
+  <script src="js/reader.js"></script>
+  <script>
+    var remote;
+    try { remote = require('@electron/remote'); } catch(e) {}
+
+    document.addEventListener('DOMContentLoaded', function() {
+      Storage;
+      ChapterManager;
+      Disguise.init();
+      ColorPicker.init();
+      Stealth.init();
+      Reader.init();
+
+      var btnMinimize = document.getElementById('btn-minimize');
+      var btnAlwaysTop = document.getElementById('btn-always-top');
+      var btnClose = document.getElementById('btn-close');
+      var btnDisguise = document.getElementById('btn-disguise');
+      var btnSettings = document.getElementById('btn-settings');
+      var btnSidebar = document.getElementById('btn-toggle-sidebar');
+
+      if (btnMinimize) {
+        btnMinimize.addEventListener('click', function() {
+          if (remote) {
+            var win = remote.getCurrentWindow();
+            win.minimize();
+          }
+        });
+      }
+
+      var isAlwaysOnTop = true;
+      if (btnAlwaysTop) {
+        btnAlwaysTop.addEventListener('click', function() {
+          isAlwaysOnTop = !isAlwaysOnTop;
+          if (remote) {
+            var win = remote.getCurrentWindow();
+            win.setAlwaysOnTop(isAlwaysOnTop);
+          }
+          this.textContent = isAlwaysOnTop ? '📌' : '📍';
+        });
+      }
+
+      if (btnClose) {
+        btnClose.addEventListener('click', function() {
+          utools.sendToParent('close-reader', {
+            chapterIndex: ChapterManager.getCurrentIndex(),
+            scrollPosition: document.getElementById('reader-content') ? document.getElementById('reader-content').scrollTop : 0
+          });
+          window.close();
+        });
+      }
+
+      if (btnDisguise) {
+        btnDisguise.addEventListener('click', function() {
+          Disguise.toggle();
+          if (!Disguise.isDisguised()) Reader.render();
+        });
+      }
+
+      if (btnSettings) {
+        btnSettings.addEventListener('click', function() {
+          if (typeof App !== 'undefined' && App._showSettingsPanel) {
+            App._showSettingsPanel();
+          }
+        });
+      }
+
+      if (btnSidebar) {
+        btnSidebar.addEventListener('click', function() {
+          document.getElementById('chapter-sidebar').classList.toggle('collapsed');
+        });
+      }
+
+      var ipcRenderer = require('electron').ipcRenderer;
+      ipcRenderer.on('reading-state', function(event, state) {
+        if (state.filePath && state.format) {
+          if (state.format === 'epub') {
+            var book = window.services.readEpub(state.filePath);
+            if (book) {
+              ChapterManager.load(book);
+              Reader.applySettings();
+              Reader.render();
+              ChapterManager.setChapter(state.chapterIndex || 0);
+              Reader.render();
+            }
+          } else {
+            var content = window.services.readFile(state.filePath);
+            if (content) {
+              var book = Parser.parseFile(state.filePath, content);
+              if (book) {
+                ChapterManager.load(book);
+                Reader.applySettings();
+                ChapterManager.setChapter(state.chapterIndex || 0);
+                Reader.render();
+              }
+            }
+          }
+        }
+        if (state.isDisguised) {
+          Disguise.setMode(state.disguiseMode);
+          Disguise.show();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
