@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
 
 window.services = {
   readFile: (filePath) => {
@@ -104,6 +103,5 @@ window.services = {
   screenCapture: (callback) => { utools.screenCapture(callback); }
 };
 
-try {
-  window.electronRequire = require;
-} catch(e) {}
+const { ipcRenderer } = require('electron');
+window._ipcRenderer = ipcRenderer;

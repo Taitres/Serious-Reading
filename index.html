@@ -5,30 +5,65 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Serious Reading</title>
   <link rel="stylesheet" href="css/base.css">
+  <style>
+    body { margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; }
+    #app { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    h2 { margin: 0 0 8px; font-size: 24px; font-weight: 600; }
+    .subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
+    .actions { display: flex; gap: 10px; margin-bottom: 20px; }
+    .actions button { padding: 10px 20px; border: none; border-radius: 6px; background: #333; color: #e0e0e0; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+    .actions button:hover { background: #444; }
+    .actions button.primary { background: #2a6; }
+    .actions button.primary:hover { background: #3b7; }
+    #recent-list { width: 100%; max-width: 400px; }
+    .recent-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #222; border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: background 0.2s; }
+    .recent-item:hover { background: #333; }
+    .recent-item .title { font-size: 13px; }
+    .recent-item .date { font-size: 11px; color: #666; }
+    .settings-btn { margin-top: 20px; padding: 8px 16px; background: #333; border: none; border-radius: 6px; color: #888; cursor: pointer; font-size: 13px; }
+    .settings-btn:hover { background: #444; color: #aaa; }
+    .settings-panel { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .settings-content { background: #222; padding: 24px; border-radius: 8px; width: 400px; max-height: 90vh; overflow-y: auto; }
+    .settings-content h3 { margin: 0 0 16px; font-size: 16px; }
+    .setting-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .setting-row label { font-size: 13px; color: #aaa; }
+    .setting-row input, .setting-row select { background: #333; border: 1px solid #444; border-radius: 4px; color: #e0e0e0; padding: 4px 8px; font-size: 13px; }
+    .preview-box { width: 100%; height: 140px; border-radius: 6px; margin: 12px 0; display: flex; flex-direction: column; border: 1px solid #444; position: relative; overflow: hidden; }
+    .preview-box .preview-title { position: absolute; top: 0; left: 0; right: 0; height: 20px; background: rgba(0,0,0,0.3); font-size: 10px; color: rgba(255,255,255,0.5); display: flex; align-items: center; padding: 0 8px; }
+    .preview-box .preview-text { flex: 1; padding: 28px 20px 20px; text-indent: 2em; line-height: 1.8; font-size: 13px; overflow: hidden; }
+    .setting-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .setting-actions button { flex: 1; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .setting-actions button.save { background: #2a6; color: #fff; }
+    .setting-actions button.close { background: #333; color: #888; }
+    .chapter-list { width: 100%; max-width: 400px; margin-top: 20px; }
+    .chapter-list h3 { margin: 0 0 8px; font-size: 14px; color: #999; }
+    .chapter-item { padding: 8px 12px; background: #222; border-radius: 4px; margin-bottom: 4px; cursor: pointer; font-size: 13px; transition: background 0.2s; }
+    .chapter-item:hover { background: #333; }
+    .chapter-item.active { background: #2a6; }
+  </style>
 </head>
 <body>
   <div id="app">
-    <div id="welcome" class="view">
-      <h2>Serious Reading</h2>
-      <p>隐蔽阅读器</p>
-      <div class="welcome-actions">
-        <button id="btn-open-file">打开文件</button>
-        <button id="btn-open-url">输入网址</button>
-        <button id="btn-continue" style="display:none">继续阅读</button>
-      </div>
-      <div id="recent-list"></div>
-      <div style="margin-top:20px;">
-        <button id="btn-settings" style="background:#444;">设置</button>
-      </div>
+    <h2>Serious Reading</h2>
+    <p class="subtitle">隐蔽阅读器</p>
+    <div class="actions">
+      <button id="btn-open-file" class="primary">打开文件</button>
+      <button id="btn-open-url">输入网址</button>
+      <button id="btn-continue" style="display:none">继续阅读</button>
     </div>
+    <div id="recent-list"></div>
+    <div id="chapter-list" class="chapter-list" style="display:none"></div>
+    <button class="settings-btn" id="btn-settings">设置</button>
   </div>
+
   <script src="js/storage.js"></script>
   <script src="js/parser.js"></script>
   <script src="js/chapter.js"></script>
   <script>
     window.App = {
+      _currentBook: null,
+
       init: function() {
-        Storage; ChapterManager;
         this._bindWelcomeActions();
         this._loadRecentList();
         var self = this;
@@ -38,6 +73,7 @@
           });
         }
       },
+
       _handlePluginEnter: function(action) {
         if (action.code === 'reader_open') {
           if (action.type === 'file' && action.payload && action.payload.length > 0) {
@@ -54,6 +90,7 @@
           this._loadRecentList();
         }
       },
+
       _openBook: function(filePath, format) {
         var book = null;
         if (format === 'epub') {
@@ -63,45 +100,50 @@
           if (content) book = Parser.parseFile(filePath, content);
         }
         if (!book) return;
+        this._currentBook = book;
         ChapterManager.load(book);
         var saved = Storage.getBookProgress(filePath);
         if (saved && saved.chapterIndex) ChapterManager.setChapter(saved.chapterIndex);
-        this._openFloatingWindow(filePath, format, saved);
+        this._showChapterList();
+        this._openReaderWindow(filePath, format, saved);
       },
-      _openFloatingWindow: function(filePath, format, saved) {
-        if (typeof utools === 'undefined' || !utools.createBrowserWindow) return;
+
+      _showChapterList: function() {
+        var el = document.getElementById('chapter-list');
+        if (!el) return;
+        var chs = ChapterManager.getChapterList();
+        if (chs.length === 0) { el.style.display = 'none'; return; }
+        var html = '<h3>章节选择</h3>';
+        chs.forEach(function(ch) {
+          html += '<div class="chapter-item" data-index="' + ch.index + '">' + ch.title + '</div>';
+        });
+        el.innerHTML = html;
+        el.style.display = 'block';
+        var self = this;
+        el.querySelectorAll('.chapter-item').forEach(function(item) {
+          item.addEventListener('click', function() {
+            var idx = parseInt(this.dataset.index);
+            ChapterManager.setChapter(idx);
+            self._openReaderWindow(self._currentBook.filePath, self._currentBook.format, { chapterIndex: idx, scrollPosition: 0 });
+          });
+        });
+      },
+
+      _openReaderWindow: function(filePath, format, saved) {
         var settings = Storage.getSettings();
         var state = {
           filePath: filePath,
           format: format,
           chapterIndex: saved ? saved.chapterIndex : 0,
-          scrollPosition: saved ? saved.scrollPosition : 0
+          scrollPosition: saved ? saved.scrollPosition : 0,
+          settings: settings
         };
-        var win = utools.createBrowserWindow(
-          'reader.html',
-          {
-            width: settings.floatWidth || 520,
-            height: settings.floatHeight || 780,
-            title: '',
-            transparent: true,
-            frame: false,
-            alwaysOnTop: true,
-            resizable: true,
-            backgroundColor: '#02fafafa',
-            skipTaskbar: true,
-            hasShadow: false,
-            thickFrame: false,
-            webPreferences: {
-              preload: 'reader_preload.js'
-            }
-          },
-          function() {
-            win.webContents.send('reading-state', state);
-            try { win.setAlwaysOnTop(true, 'screen-saver'); } catch(e) {}
-          }
-        );
-        utools.outPlugin();
+        if (window.services && window.services.createReaderWindow) {
+          window.services.createReaderWindow(state);
+        }
+        if (typeof utools !== 'undefined') utools.outPlugin();
       },
+
       _openUrl: function(url) {
         if (!window.services || !window.services.fetchUrl) return;
         var self = this;
@@ -109,12 +151,13 @@
           var book = Parser.parseOnline(html, url);
           if (book) {
             ChapterManager.load(book);
-            self._openFloatingWindow(url, 'online', null);
+            self._openReaderWindow(url, 'online', null);
           }
         }).catch(function(err) {
           alert('无法获取网页内容: ' + err.message);
         });
       },
+
       _bindWelcomeActions: function() {
         var self = this;
         document.getElementById('btn-open-file').addEventListener('click', function() {
@@ -146,6 +189,7 @@
           self._showSettingsPanel();
         });
       },
+
       _loadRecentList: function() {
         var el = document.getElementById('recent-list');
         if (!el) return;
@@ -154,8 +198,8 @@
         var html = '<h3 style="margin-bottom:8px;font-size:14px;color:#999;">最近阅读</h3>';
         history.slice(0, 8).forEach(function(item) {
           html += '<div class="recent-item" data-path="' + item.filePath + '" data-format="' + item.format + '">';
-          html += '<span>' + item.title + '</span>';
-          html += '<span style="font-size:11px;color:#666;">' + new Date(item.lastRead).toLocaleDateString() + '</span>';
+          html += '<span class="title">' + item.title + '</span>';
+          html += '<span class="date">' + new Date(item.lastRead).toLocaleDateString() + '</span>';
           html += '</div>';
         });
         el.innerHTML = html;
@@ -165,30 +209,68 @@
           });
         });
       },
+
       _showSettingsPanel: function() {
         var existing = document.querySelector('.settings-panel');
         if (existing) { existing.remove(); return; }
         var settings = Storage.getSettings();
         var panel = document.createElement('div');
         panel.className = 'settings-panel';
+        var fr = settings.fr || {};
         panel.innerHTML =
           '<div class="settings-content">' +
           '<h3>阅读设置</h3>' +
-          '<div class="setting-row"><label>默认字体大小</label><input type="range" id="set-fontsize" min="12" max="28" value="' + (settings.floatFontSize || 17) + '"><span id="set-fontsize-val">' + (settings.floatFontSize || 17) + '</span></div>' +
+          '<div class="setting-row"><label>默认字体大小</label><input type="range" id="set-fontsize" min="12" max="28" value="' + (fr.fontSize || 17) + '"><span id="set-fontsize-val">' + (fr.fontSize || 17) + '</span></div>' +
+          '<div class="setting-row"><label>默认行距</label><input type="range" id="set-lineheight" min="1.2" max="3.0" step="0.1" value="' + (fr.lineHeight || 1.85) + '"><span id="set-lh-val">' + (fr.lineHeight || 1.85) + '</span></div>' +
+          '<div class="setting-row"><label>背景色</label><input type="color" id="set-bgcolor" value="' + (fr.bgColor || '#f5f5f5') + '"></div>' +
+          '<div class="setting-row"><label>文字色</label><input type="color" id="set-textcolor" value="' + (fr.textColor || '#1a1a1a') + '"></div>' +
+          '<div class="setting-row"><label>透明度</label><input type="range" id="set-opacity" min="0.1" max="1" step="0.05" value="' + (fr.opacity || 1) + '"><span id="set-opacity-val">' + Math.round((fr.opacity || 1)*100) + '%</span></div>' +
+          '<div class="preview-box" id="preview-box" style="background:' + (fr.bgColor || '#f5f5f5') + ';color:' + (fr.textColor || '#1a1a1a') + ';opacity:' + (fr.opacity || 1) + ';">' +
+          '<div class="preview-title">Serious Reading</div>' +
+          '<div class="preview-text">这是一段预览文字，用于展示阅读窗口的实际效果。你可以调整背景色、文字色和透明度来预览。</div>' +
+          '</div>' +
           '<div class="setting-row"><label>窗口宽度</label><input type="number" id="set-width" min="300" max="1200" step="20" value="' + (settings.floatWidth || 520) + '"></div>' +
           '<div class="setting-row"><label>窗口高度</label><input type="number" id="set-height" min="400" max="1400" step="20" value="' + (settings.floatHeight || 780) + '"></div>' +
-          '<div class="setting-row"><label>鼠标动作</label><select id="set-mouse"><option value="doubleclick"' + (settings.mouseAction === 'doubleclick' ? ' selected' : '') + '>双击切换</option><option value="click"' + (settings.mouseAction === 'click' ? ' selected' : '') + '>单击切换</option><option value="none"' + (settings.mouseAction === 'none' ? ' selected' : '') + '>无</option></select></div>' +
-          '<div class="setting-actions"><button id="set-save">保存</button><button id="set-close">关闭</button></div>' +
+          '<div class="setting-row"><label>鼠标离开自动隐藏</label><select id="set-edge"><option value="1500"' + ((settings.edgeHideDelay || 1500) === 1500 ? ' selected' : '') + '>1.5秒</option><option value="3000"' + ((settings.edgeHideDelay || 1500) === 3000 ? ' selected' : '') + '>3秒</option><option value="0"' + (settings.edgeHideDelay === 0 ? ' selected' : '') + '>关闭</option></select></div>' +
+          '<div class="setting-row"><label>双击隐藏</label><select id="set-dblclick"><option value="1"' + (settings.dblClickHide !== 0 ? ' selected' : '') + '>开启</option><option value="0"' + (settings.dblClickHide === 0 ? ' selected' : '') + '>关闭</option></select></div>' +
+          '<div class="setting-actions"><button class="save" id="set-save">保存</button><button class="close" id="set-close">关闭</button></div>' +
           '</div>';
         document.body.appendChild(panel);
+
+        var updatePreview = function() {
+          var bg = document.getElementById('set-bgcolor').value;
+          var tc = document.getElementById('set-textcolor').value;
+          var op = document.getElementById('set-opacity').value;
+          var preview = document.getElementById('preview-box');
+          preview.style.background = bg;
+          preview.style.color = tc;
+          preview.style.opacity = op;
+        };
+
         document.getElementById('set-fontsize').addEventListener('input', function() {
           document.getElementById('set-fontsize-val').textContent = this.value;
         });
+        document.getElementById('set-lineheight').addEventListener('input', function() {
+          document.getElementById('set-lh-val').textContent = this.value;
+        });
+        document.getElementById('set-opacity').addEventListener('input', function() {
+          document.getElementById('set-opacity-val').textContent = Math.round(parseFloat(this.value)*100) + '%';
+          updatePreview();
+        });
+        document.getElementById('set-bgcolor').addEventListener('input', updatePreview);
+        document.getElementById('set-textcolor').addEventListener('input', updatePreview);
+
         document.getElementById('set-save').addEventListener('click', function() {
-          settings.floatFontSize = parseInt(document.getElementById('set-fontsize').value);
+          settings.fr = settings.fr || {};
+          settings.fr.fontSize = parseInt(document.getElementById('set-fontsize').value);
+          settings.fr.lineHeight = parseFloat(document.getElementById('set-lineheight').value);
+          settings.fr.bgColor = document.getElementById('set-bgcolor').value;
+          settings.fr.textColor = document.getElementById('set-textcolor').value;
+          settings.fr.opacity = parseFloat(document.getElementById('set-opacity').value);
           settings.floatWidth = parseInt(document.getElementById('set-width').value);
           settings.floatHeight = parseInt(document.getElementById('set-height').value);
-          settings.mouseAction = document.getElementById('set-mouse').value;
+          settings.edgeHideDelay = parseInt(document.getElementById('set-edge').value);
+          settings.dblClickHide = parseInt(document.getElementById('set-dblclick').value);
           Storage.saveSettings(settings);
           panel.remove();
         });

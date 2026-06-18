@@ -146,6 +146,35 @@ window.services = {
     } catch (e) {
       return null;
     }
+  },
+  createReaderWindow: function(state) {
+    var settings = state.settings || {};
+    var fr = settings.fr || {};
+    var win = utools.createBrowserWindow('reader.html', {
+      width: settings.floatWidth || 520,
+      height: settings.floatHeight || 780,
+      title: '',
+      transparent: true,
+      frame: false,
+      alwaysOnTop: true,
+      resizable: true,
+      backgroundColor: 'rgba(255,255,255,0.01)',
+      skipTaskbar: true,
+      hasShadow: false,
+      thickFrame: false,
+      roundedCorners: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      closeable: true,
+      webPreferences: {
+        preload: 'reader_preload.js'
+      }
+    }, function() {
+      win.webContents.send('reading-state', state);
+      try { win.setAlwaysOnTop(true, 'screen-saver'); } catch(e) {}
+    });
+    return win;
   }
 };
 

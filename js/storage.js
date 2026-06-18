@@ -1,13 +1,31 @@
 window.Storage = {
   _prefix: 'serious_reading/',
+  _store: null,
+  _getStore: function() {
+    if (this._store) return this._store;
+    try {
+      if (typeof utools !== 'undefined' && utools.dbStorage) {
+        this._store = 'utools';
+        return 'utools';
+      }
+    } catch(e) {}
+    this._store = 'local';
+    return 'local';
+  },
   get: function(key) {
-    return utools.dbStorage.getItem(this._prefix + key);
+    var k = this._prefix + key;
+    if (this._getStore() === 'utools') return utools.dbStorage.getItem(k);
+    try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch(e) { return null; }
   },
   set: function(key, value) {
-    utools.dbStorage.setItem(this._prefix + key, value);
+    var k = this._prefix + key;
+    if (this._getStore() === 'utools') { utools.dbStorage.setItem(k, value); return; }
+    try { localStorage.setItem(k, JSON.stringify(value)); } catch(e) {}
   },
   remove: function(key) {
-    utools.dbStorage.removeItem(this._prefix + key);
+    var k = this._prefix + key;
+    if (this._getStore() === 'utools') { utools.dbStorage.removeItem(k); return; }
+    try { localStorage.removeItem(k); } catch(e) {}
   },
   getSettings: function() {
     return this.get('settings') || {

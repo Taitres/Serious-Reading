@@ -7,7 +7,8 @@ window.Parser = {
     return null;
   },
   parseTxt: function(content, filePath) {
-    var chapterPattern = /^(第[零一二三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟\d]+[章节回卷集部篇]|Chapter\s+\d+|CHAPTER\s+\d+).*/gm;
+    if (content.charCodeAt(0) === 0xFEFF) content = content.substring(1);
+    var chapterPattern = /^(第[零一二三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟\d]+[章节回卷集部篇](?![的得了地]))\s*(.*)/gm;
     var chapters = [];
     var match;
     var lastIndex = 0;
