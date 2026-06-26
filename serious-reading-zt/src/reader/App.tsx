@@ -1,0 +1,514 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { ParsedBook, Chapter, BookFormat, Settings, ReadingProgress, TriggerKey } from '@/shared/types'
+import { getSettings, getProgress, saveProgress, addRecentBook } from '@/shared/storage'
+import { parseTxt, buildEpub, renderChapterHtml } from '@/shared/parser'
+import { PdfView } from './components/PdfView'
+
+export default function App() {
+  const [settings, setSettings] = useState<Settings>(() => getSettings())
+  const [book, setBook] = useState<ParsedBook | null>(null)
+  const [chapter, setChapter] = useState<Chapter | null>(null)
+  const [chapterIdx, setChapterIdx] = useState(0)
+  const [pageIndex, setPageIndex] = useState(0)
+  const [charOffset, setCharOffset] = useState(0)
+  const [stealth, setStealth] = useState(false)
+  const [resizeN, setResizeN] = useState(0)
+  // PDF
+  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null)
+  const [pdfPage, setPdfPage] = useState(1)
+  const [pdfTotal, setPdfTotal] = useState(0)
+  // 分页
+  const [pages, setPages] = useState<string[]>(['<p style="padding-top:40vh;text-align:center;opacity:.4">正在加载…</p>'])
+  const measureRef = useRef<HTMLDivElement>(null)
+  const [showNav, setShowNav] = useState(false)
+  const [navQ, setNavQ] = useState('')
+
+  const ipc = (window as any)._ipcRenderer
+  const sendParent = (window as any)._sendToParent as ((c: string, d?: any) => void) | undefined
+
+  /* ---- 接收主窗推送 ---- */
+  useEffect(() => {
+    ipc?.on('sr:reading-state', (_e: unknown, state: any) => loadState(state))
+    ipc?.on('sr:show-reader', () => setStealth(false))
+    ipc?.on('sr:settings', (_e: unknown, s: Settings) => { if (s) setSettings(s) })
+    return () => {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function loadState(state: any) {
+    if (!state?.filePath) return
+    setStealth(false)
+    void loadBook(state.filePath, state.format as BookFormat, state)
+  }
+
+  async function loadBook(filePath: string, format: BookFormat, state?: any) {
+    const svc = window.services
+    let pb: ParsedBook | null = null
+    if (format === 'txt') {
+      const txt = svc?.readTxt(filePath)
+      if (txt) pb = parseTxt(txt, filePath)
+    } else if (format === 'epub') {
+      const eb = svc?.readEpub(filePath)
+      if (eb) pb = buildEpub(eb, filePath)
+    } else if (format === 'pdf') {
+      const buf = svc?.readPdf(filePath)
+      if (buf) {
+        setPdfData(buf)
+        setPdfPage(state?.pdfPage ?? state?.chapterIndex ?? 1)
+        const fake = { title: filePath.split(/[\\/]/).pop()!, filePath, format: 'pdf' as BookFormat, chapters: [], totalChapters: 1 }
+        setBook(fake)
+        addRecentBook({ filePath, title: fake.title, format: 'pdf', lastRead: Date.now() })
+        saveProgress({ filePath, format: 'pdf', chapterIndex: state?.pdfPage ?? 1, pageIndex: 0, timestamp: Date.now() })
+      }
+      return
+    }
+    if (!pb) return
+    setPdfData(null)
+    setBook(pb)
+    addRecentBook({ filePath, title: pb.title, format, lastRead: Date.now() })
+    const prog = getProgress(filePath)
+    const ci = state?.chapterIndex ?? prog?.chapterIndex ?? 0
+    setChapterIdx(ci)
+    setCharOffset(state?.charOffset ?? prog?.charOffset ?? (pb.chapters[ci]?.charOffset ?? 0))
+    setPageIndex(state?.pageIndex ?? prog?.pageIndex ?? 0)
+  }
+
+  const currentChapter = book?.chapters[chapterIdx] ?? null
+  useEffect(() => { setChapter(currentChapter) }, [currentChapter])
+  const chapterHtml = useMemo(
+    () => (book && chapter ? renderChapterHtml(chapter.content, book.format) : ''),
+    [book, chapter],
+  )
+
+  /* ---- 高度测量分页（txt/epub） ---- */
+  useLayoutEffect(() => {
+    if (!book || book.format === 'pdf' || !chapterHtml) return
+    const measure = measureRef.current
+    if (!measure) return
+    const pageH = window.innerHeight - 88
+    const pageW = window.innerWidth - 80
+    measure.style.width = pageW + 'px'
+    measure.style.fontSize = settings.reader.fontSize + 'px'
+    measure.style.lineHeight = String(settings.reader.lineHeight)
+    measure.style.fontFamily = settings.reader.fontFamily || 'inherit'
+    measure.innerHTML = chapterHtml
+    const nodes: { height: number; html: string }[] = []
+    measure.childNodes.forEach((node) => {
+      if (node.nodeType === 3 && node.textContent?.trim()) {
+        const span = document.createElement('span')
+        span.textContent = node.textContent
+        measure.replaceChild(span, node)
+        nodes.push({ height: span.offsetHeight, html: span.outerHTML })
+      } else if (node.nodeType === 1) {
+        const el = node as HTMLElement
+        nodes.push({ height: el.offsetHeight, html: el.outerHTML })
+      }
+    })
+    const result: string[] = []
+    let cur = ''
+    let used = 0
+    for (const n of nodes) {
+      if (used + n.height > pageH && used > 0) { result.push(cur); cur = ''; used = 0 }
+      cur += n.html
+      used += n.height
+    }
+    if (cur) result.push(cur)
+    measure.innerHTML = ''
+    setPages(result.length ? result : ['<p style="text-align:center;opacity:.4">本章无内容</p>'])
+    setPageIndex((p) => Math.min(p, result.length - 1))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterHtml, settings.reader.fontSize, settings.reader.lineHeight, resizeN])
+
+  /* ---- 百分比 ---- */
+  const percent = useMemo(() => {
+    if (!book) return 0
+    if (book.format === 'pdf') return pdfTotal ? (pdfPage / pdfTotal) * 100 : 0
+    if (book.fullText) return ((charOffset / book.fullText.length) * 100)
+    return book.totalChapters ? ((chapterIdx + 1) / book.totalChapters) * 100 : 0
+  }, [book, charOffset, chapterIdx, pdfPage, pdfTotal])
+
+  /* ---- 章节搜索过滤（导航面板用） ---- */
+  const filteredChapters = useMemo(() => {
+    if (!book || book.format === 'pdf') return []
+    const q = navQ.trim().toLowerCase()
+    if (!q) return book.chapters
+    return book.chapters.filter((c) => c.title.toLowerCase().includes(q) || String(c.index + 1).includes(q))
+  }, [book, navQ])
+
+  /* ---- 翻页 ---- */
+  const nextPage = useCallback(() => {
+    if (book?.format === 'pdf') { setPdfPage((p) => Math.min(p + 1, pdfTotal || p + 1)); return }
+    if (pageIndex < pages.length - 1) setPageIndex(pageIndex + 1)
+    else nextChapter()
+  }, [book, pageIndex, pages.length])
+
+  const prevPage = useCallback(() => {
+    if (book?.format === 'pdf') { setPdfPage((p) => Math.max(1, p - 1)); return }
+    if (pageIndex > 0) setPageIndex(pageIndex - 1)
+    else prevChapter()
+  }, [book, pageIndex])
+
+  // 用 ref 持有最新回调/状态，避免 document 事件监听反复挂载
+  const nextPageRef = useRef(nextPage); nextPageRef.current = nextPage
+  const prevPageRef = useRef(prevPage); prevPageRef.current = prevPage
+  const pagesRef = useRef(pages); pagesRef.current = pages
+  const hideRef = useRef(settings.hide); hideRef.current = settings.hide
+  const pageCfgRef = useRef(settings.page); pageCfgRef.current = settings.page
+  const stealthRef = useRef(stealth); stealthRef.current = stealth
+
+  function nextChapter() {
+    if (!book || book.format === 'pdf') return
+    if (chapterIdx < book.totalChapters - 1) {
+      const ni = chapterIdx + 1
+      setChapterIdx(ni)
+      setCharOffset(book.chapters[ni]?.charOffset ?? 0)
+      setPageIndex(0)
+    }
+  }
+  function prevChapter() {
+    if (!book || book.format === 'pdf') return
+    if (chapterIdx > 0) {
+      const pi = chapterIdx - 1
+      setChapterIdx(pi)
+      setCharOffset(book.chapters[pi]?.charOffset ?? 0)
+      setPageIndex(0)
+    }
+  }
+  function goChapter(idx: number) {
+    if (!book || book.format === 'pdf') return
+    if (idx >= 0 && idx < book.totalChapters) {
+      setChapterIdx(idx)
+      setCharOffset(book.chapters[idx]?.charOffset ?? 0)
+      setPageIndex(0)
+    }
+  }
+
+  /* ---- 进度保存 ---- */
+  useEffect(() => {
+    if (!book) return
+    const t = setTimeout(() => {
+      const pg: ReadingProgress = {
+        filePath: book.filePath, format: book.format,
+        chapterIndex: book.format === 'pdf' ? pdfPage : chapterIdx,
+        pageIndex, charOffset, timestamp: Date.now(),
+      }
+      saveProgress(pg)
+    }, 400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterIdx, pageIndex, charOffset, pdfPage])
+
+  /* ---- document 级事件：阅读窗容器是 drag region，React 事件会被吞掉 ---- */
+  function dispatchTrigger(key: TriggerKey, e?: Event) {
+    const hide = hideRef.current
+    if (hide.realHide.includes(key)) { e?.preventDefault?.(); sendParent?.('sr:hide-reader'); return }
+    const isStealth = stealthRef.current
+    if (!isStealth && hide.stealthHide.includes(key)) { setStealth(true); return }
+    if (isStealth && hide.stealthShow.includes(key)) { setStealth(false); return }
+  }
+  useEffect(() => {
+    window.focus()
+    const onKey = (e: KeyboardEvent) => {
+      const hide = hideRef.current
+      if (e.key === 'Escape' && (hide.stealthHide.includes('escape') || hide.stealthShow.includes('escape') || hide.realHide.includes('escape'))) { dispatchTrigger('escape', e); e.preventDefault(); return }
+      const p = pageCfgRef.current
+      if (p.arrow && e.key === 'ArrowRight') { nextPageRef.current(); e.preventDefault() }
+      if (p.arrow && e.key === 'ArrowLeft') { prevPageRef.current(); e.preventDefault() }
+      if (p.pgupdn && e.key === 'PageDown') { nextPageRef.current(); e.preventDefault() }
+      if (p.pgupdn && e.key === 'PageUp') { prevPageRef.current(); e.preventDefault() }
+      if (p.space && e.key === ' ') { nextPageRef.current(); e.preventDefault() }
+      if (e.key === 'Home') { setPageIndex(0) }
+      if (e.key === 'End') { setPageIndex(pagesRef.current.length - 1) }
+    }
+    const onDbl = (e: MouseEvent) => { dispatchTrigger('dblclick', e) }
+    const onDown = (e: MouseEvent) => { if (e.button === 1) dispatchTrigger('middleClick', e) }
+    const onCtx = (e: MouseEvent) => {
+      const hide = hideRef.current
+      if (hide.realHide.includes('rightClick') || hide.stealthHide.includes('rightClick') || hide.stealthShow.includes('rightClick')) { e.preventDefault(); dispatchTrigger('rightClick', e) }
+    }
+    const onLeave = () => { dispatchTrigger('mouseleave') }
+    const onEnter = () => { dispatchTrigger('mouseenter') }
+    const onWheel = (e: WheelEvent) => {
+      if (pageCfgRef.current.wheel) { e.preventDefault(); if (e.deltaY > 0 || e.deltaX > 0) nextPageRef.current(); else prevPageRef.current() }
+    }
+    let tx = 0, ty = 0
+    const onTouchStart = (e: TouchEvent) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY }
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!pageCfgRef.current.touch) return
+      const dx = e.changedTouches[0].clientX - tx
+      const dy = e.changedTouches[0].clientY - ty
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) { if (dx < 0) nextPageRef.current(); else prevPageRef.current() }
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('dblclick', onDbl)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('contextmenu', onCtx)
+    document.addEventListener('mouseleave', onLeave)
+    document.addEventListener('mouseenter', onEnter)
+    document.addEventListener('wheel', onWheel, { passive: false })
+    document.addEventListener('touchstart', onTouchStart)
+    document.addEventListener('touchend', onTouchEnd)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('dblclick', onDbl)
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('contextmenu', onCtx)
+      document.removeEventListener('mouseleave', onLeave)
+      document.removeEventListener('mouseenter', onEnter)
+      document.removeEventListener('wheel', onWheel)
+      document.removeEventListener('touchstart', onTouchStart)
+      document.removeEventListener('touchend', onTouchEnd)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /* ---- 自动翻页 ---- */
+  useEffect(() => {
+    const interval = settings.autoPage.interval
+    if (!interval || interval <= 0) return
+    if (stealth && settings.autoPage.pauseOnStealth) return
+    const t = setInterval(() => nextPage(), interval * 1000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.autoPage, nextPage, stealth])
+
+  /* ---- resize 重排 ---- */
+  useEffect(() => {
+    const onRes = () => setResizeN((n) => n + 1)
+    window.addEventListener('resize', onRes)
+    const saveT = setInterval(() => sendBounds(), 5000)
+    window.addEventListener('beforeunload', sendBounds)
+    return () => { window.removeEventListener('resize', onRes); clearInterval(saveT); window.removeEventListener('beforeunload', sendBounds) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function sendBounds() {
+    const x = window.screenLeft, y = window.screenTop, w = window.innerWidth, h = window.innerHeight
+    if (w > 120 && h > 120 && w < 8000 && h < 8000) sendParent?.('sr:save-bounds', { x, y, width: w, height: h })
+  }
+
+  /* ---- 百分比跳转 ---- */
+  function jumpPercent(v: number) {
+    if (!book) return
+    if (book.format === 'pdf') { setPdfPage(Math.max(1, Math.ceil((v / 100) * pdfTotal))); return }
+    if (book.fullText) {
+      const target = Math.round((v / 100) * book.fullText.length)
+      let ci = 0
+      for (let i = 0; i < book.chapters.length; i++) {
+        const c = book.chapters[i]
+        if ((c.charOffset ?? 0) <= target) ci = i
+      }
+      setChapterIdx(ci); setCharOffset(target); setPageIndex(0)
+    } else {
+      const ci = Math.min(book.totalChapters - 1, Math.floor((v / 100) * book.totalChapters))
+      goChapter(ci)
+    }
+  }
+
+  if (!book && !pdfData) {
+    return <div className="sr-no-drag flex h-full w-full items-center justify-center text-sm text-muted-foreground">正在加载…</div>
+  }
+
+  return (
+    <div
+      className={`relative h-screen w-screen overflow-hidden ${stealth ? 'sr-stealth' : ''}`}
+      style={{
+        background: stealth ? 'transparent' : settings.reader.bgColor,
+        color: stealth ? 'transparent' : settings.reader.textColor,
+        opacity: stealth ? 1 : settings.reader.opacity,
+        fontSize: settings.reader.fontSize,
+        lineHeight: settings.reader.lineHeight,
+      }}
+    >
+      {/* 纯 JS 窗口移动 + 缩放把手（不使用 drag region，避免吞掉右键/中键） */}
+      <WindowHandles sendParent={sendParent} />
+
+      {/* 内容区：整窗无 drag region，右键/中键/双击/滚轮/翻页全部正常 */}
+      <div
+        className="absolute inset-0 overflow-hidden pt-5 select-none"
+        onCopy={(e) => e.preventDefault()}
+      >
+        {/* 测量容器 */}
+        <div ref={measureRef} className="absolute left-[-9999px] top-0" style={{ visibility: 'hidden' }} />
+
+        {/* PDF 模式 */}
+        {book?.format === 'pdf' && pdfData ? (
+          <div className="h-full w-full">
+            <PdfView data={pdfData} page={pdfPage} scale={1.2} onPageReady={setPdfTotal} />
+          </div>
+        ) : (
+          <>
+            {/* 分页内容条：绝对定位单页切换，避免 flex 子项被压缩导致竖排 */}
+            <div
+              className="relative h-full w-full transition-transform duration-200"
+              style={{ transform: `translateX(-${pageIndex * 100}%)` }}
+            >
+              {pages.map((p, i) => (
+                <div
+                  key={i}
+                  className="absolute left-0 top-0 h-full overflow-y-auto px-10 py-8 select-none"
+                  style={{ width: '100%', left: `${i * 100}%` }}
+                  dangerouslySetInnerHTML={{ __html: p }}
+                />
+              ))}
+            </div>
+
+            {/* 翻页点击区 */}
+            {settings.page.click && !stealth && (
+              <>
+                <button className="absolute top-0 left-0 h-full" style={{ width: '30vw' }} onClick={prevPage} />
+                <button className="absolute top-0 right-0 h-full" style={{ width: '30vw' }} onClick={nextPage} />
+              </>
+            )}
+
+            {/* 进度条 */}
+            {!stealth && (
+              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-black/5">
+                <div className="h-full bg-black/25" style={{ width: ((pages.length ? (pageIndex + 1) / pages.length : 1)) * 100 + '%' }} />
+              </div>
+            )}
+          </>
+        )}
+
+        {/* 章节导航 + 搜索 + 百分比跳转（底部左侧触发，面板浮在内容上） */}
+        {!stealth && (
+          <>
+            {/* 触发条：左下显示当前章节，点击展开面板 */}
+            <button
+              className="absolute bottom-1 left-2 flex items-center gap-1 rounded px-1.5 text-[10px] opacity-70 hover:opacity-100"
+              style={{ color: settings.reader.textColor }}
+              onClick={() => { setShowNav((v) => !v); setNavQ('') }}
+              title="章节目录 / 搜索 / 跳转"
+            >
+              {book && book.format !== 'pdf'
+                ? `${chapterIdx + 1}/${book.totalChapters} · ${
+                    book.chapters[chapterIdx]?.title ?? ''
+                  }`
+                : `页 ${pdfPage}${pdfTotal ? '/' + pdfTotal : ''}`}
+            </button>
+
+            {/* 面板 */}
+            {showNav && (
+              <div
+                className="absolute bottom-7 left-2 z-[55] w-64 max-h-[60%] overflow-hidden rounded-md border border-black/10 bg-white/95 shadow-lg dark:border-white/10 dark:bg-neutral-900/95"
+                style={{ color: settings.reader.textColor }}
+              >
+                {/* 搜索 + 百分比 */}
+                <div className="flex items-center gap-1 border-b border-black/10 p-1.5 dark:border-white/10">
+                  <input
+                    value={navQ}
+                    onChange={(e) => setNavQ(e.target.value)}
+                    placeholder={book?.format === 'pdf' ? '搜索 PDF 不适用' : '搜章节标题'}
+                    className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-40"
+                  />
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      const el = e.currentTarget['p'] as HTMLInputElement
+                      const v = parseFloat(el.value)
+                      if (!isNaN(v)) jumpPercent(Math.max(0, Math.min(100, v)))
+                      el.value = ''
+                      el.blur()
+                      setShowNav(false)
+                    }}
+                    className="flex items-center"
+                  >
+                    <input
+                      name="p"
+                      type="number"
+                      step="0.01"
+                      placeholder={percent.toFixed(1)}
+                      className="w-10 bg-transparent text-right text-xs outline-none placeholder:opacity-40"
+                    />
+                    <span className="text-[10px] opacity-60">%</span>
+                  </form>
+                </div>
+
+                {/* 章节列表（PDF 时隐藏） */}
+                {book && book.format !== 'pdf' ? (
+                  <div className="max-h-48 overflow-y-auto py-0.5">
+                    {filteredChapters.length === 0 && (
+                      <div className="px-2 py-2 text-center text-[11px] opacity-40">无匹配章节</div>
+                    )}
+                    {filteredChapters.map((c) => {
+                      const idx = book.chapters.indexOf(c)
+                      return (
+                        <button
+                          key={`${idx}-${c.title}`}
+                          className={`block w-full truncate px-2.5 py-1 text-left text-xs hover:bg-black/5 dark:hover:bg-white/10 ${
+                            idx === chapterIdx ? 'font-bold' : ''
+                          }`}
+                          onClick={() => { goChapter(idx); setShowNav(false) }}
+                          title={c.title}
+                        >
+                          {c.title}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="px-2 py-2 text-center text-[11px] opacity-40">PDF 模式请用 % 跳页</div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 纯 JS 窗口移动 + 缩放把手。
+ * 不使用 -webkit-app-region:drag（会吞掉右键/中键），改为鼠标按下后通过 IPC
+ * 让主窗调用 win.setPosition / win.setBounds 完成移动与缩放。
+ * 整窗保持 no-drag，右键/中键/双击/滚轮/翻页触发全部正常。
+ */
+function WindowHandles({ sendParent }: { sendParent?: (c: string, d?: any) => void }) {
+  const [drag, setDrag] = useState<{ type: string; sx: number; sy: number } | null>(null)
+
+  useEffect(() => {
+    if (!drag) return
+    const onMove = (e: MouseEvent) => {
+      sendParent?.('sr:win-delta', { type: drag.type, dx: e.screenX - drag.sx, dy: e.screenY - drag.sy })
+    }
+    const onUp = () => {
+      sendParent?.('sr:win-end')
+      setDrag(null)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [drag, sendParent])
+
+  const start = (type: string) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    sendParent?.('sr:win-start', { type })
+    setDrag({ type, sx: e.screenX, sy: e.screenY })
+  }
+
+  const handles = [
+    // 移动：顶部条
+    { type: 'move', cls: 'left-0 right-0 top-0 z-50 h-5 cursor-move bg-black/[0.03] hover:bg-black/10 dark:bg-white/[0.03] dark:hover:bg-white/10' },
+    // 缩放：四边/四角，全部放在窗口内并置于最上层（z-[60] 高于移动条）
+    { type: 'w', cls: 'left-0 top-0 bottom-0 w-1.5 z-[60] cursor-ew-resize' },
+    { type: 'e', cls: 'right-0 top-0 bottom-0 w-1.5 z-[60] cursor-ew-resize' },
+    { type: 's', cls: 'left-0 right-0 bottom-0 h-1.5 z-[60] cursor-ns-resize' },
+    { type: 'nw', cls: 'left-0 top-0 w-3 h-3 z-[60] cursor-nw-resize' },
+    { type: 'ne', cls: 'right-0 top-0 w-3 h-3 z-[60] cursor-ne-resize' },
+    { type: 'sw', cls: 'left-0 bottom-0 w-3 h-3 z-[60] cursor-sw-resize' },
+    { type: 'se', cls: 'right-0 bottom-0 w-3 h-3 z-[60] cursor-se-resize' },
+  ]
+
+  return (
+    <>
+      {handles.map((h) => (
+        <div key={h.type} className={`absolute ${h.cls}`} title={h.type === 'move' ? '拖拽移动' : '拖拽缩放'} onMouseDown={start(h.type)} />
+      ))}
+    </>
+  )
+}

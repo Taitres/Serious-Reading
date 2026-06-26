@@ -4,279 +4,557 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Serious Reading</title>
-  <link rel="stylesheet" href="css/base.css">
   <style>
-    body { margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; }
-    #app { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-    h2 { margin: 0 0 8px; font-size: 24px; font-weight: 600; }
-    .subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
-    .actions { display: flex; gap: 10px; margin-bottom: 20px; }
-    .actions button { padding: 10px 20px; border: none; border-radius: 6px; background: #333; color: #e0e0e0; cursor: pointer; font-size: 14px; transition: background 0.2s; }
-    .actions button:hover { background: #444; }
-    .actions button.primary { background: #2a6; }
-    .actions button.primary:hover { background: #3b7; }
-    #recent-list { width: 100%; max-width: 400px; }
-    .recent-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #222; border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: background 0.2s; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; }
+    #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    /* Top bar */
+    .top-bar { display: flex; align-items: center; padding: 10px 16px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid #2a2a2a; }
+    .top-bar .logo { font-size: 16px; font-weight: 600; margin-right: auto; }
+    .top-bar .logo span { color: #2a6; }
+    .top-bar button { padding: 6px 14px; border: none; border-radius: 5px; background: #333; color: #ccc; cursor: pointer; font-size: 12px; transition: background 0.2s; white-space: nowrap; }
+    .top-bar button:hover { background: #444; }
+    .top-bar button.primary { background: #2a6; color: #fff; }
+    .top-bar button.primary:hover { background: #3b7; }
+    .top-bar .icon-btn { padding: 6px 10px; font-size: 14px; }
+
+    /* Main content area */
+    .main { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* Bookshelf */
+    .bookshelf { width: 100%; }
+    .bookshelf-empty { text-align: center; padding: 32px 0; color: #555; font-size: 13px; }
+    .book-card { background: #222; border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+    .book-card-header { display: flex; align-items: center; padding: 10px 12px; cursor: pointer; transition: background 0.2s; }
+    .book-card-header:hover { background: #2a2a2a; }
+    .book-card-header .book-title { font-size: 13px; color: #e0e0e0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .book-card-header .book-meta { font-size: 11px; color: #666; margin-left: 8px; white-space: nowrap; }
+    .book-card-header .arrow { color: #666; font-size: 10px; transition: transform 0.2s; margin-left: 8px; }
+    .book-card.open .arrow { transform: rotate(90deg); }
+    .chapter-panel { display: none; border-top: 1px solid #2a2a2a; padding: 8px 0; }
+    .book-card.open .chapter-panel { display: block; }
+
+    /* Chapter jump */
+    .chapter-jump { display: flex; align-items: center; gap: 6px; padding: 6px 12px 8px; }
+    .chapter-jump label { font-size: 11px; color: #888; white-space: nowrap; }
+    .chapter-jump input { width: 56px; padding: 3px 6px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; color: #e0e0e0; font-size: 12px; text-align: center; outline: none; }
+    .chapter-jump input:focus { border-color: #2a6; }
+    .chapter-jump .jump-total { font-size: 11px; color: #666; }
+    .chapter-jump button { padding: 3px 10px; background: #2a6; border: none; border-radius: 4px; color: #fff; font-size: 11px; cursor: pointer; }
+    .chapter-jump button:hover { background: #3b7; }
+
+    /* Chapter list */
+    .chapter-list { max-height: 180px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #444 #222; }
+    .chapter-list::-webkit-scrollbar { width: 4px; }
+    .chapter-list::-webkit-scrollbar-track { background: #222; }
+    .chapter-list::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+    .chapter-item { padding: 6px 12px 6px 20px; font-size: 12px; color: #aaa; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .chapter-item:hover { background: #2a2a2a; color: #e0e0e0; }
+    .chapter-item.active { color: #2a6; background: rgba(42,170,102,0.1); }
+
+    /* Recent list */
+    .recent-section { margin-top: 4px; }
+    .recent-section .section-title { font-size: 11px; color: #555; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+    .recent-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #222; border-radius: 6px; margin-bottom: 4px; cursor: pointer; transition: background 0.2s; }
     .recent-item:hover { background: #333; }
-    .recent-item .title { font-size: 13px; }
-    .recent-item .date { font-size: 11px; color: #666; }
-    .settings-btn { margin-top: 20px; padding: 8px 16px; background: #333; border: none; border-radius: 6px; color: #888; cursor: pointer; font-size: 13px; }
-    .settings-btn:hover { background: #444; color: #aaa; }
-    .settings-panel { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .recent-item .title { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .recent-item .date { font-size: 10px; color: #555; margin-left: 8px; white-space: nowrap; }
+
+    /* Settings panel */
+    .settings-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .settings-overlay.show { display: flex; }
     .settings-content { background: #222; padding: 24px; border-radius: 8px; width: 400px; max-height: 90vh; overflow-y: auto; }
     .settings-content h3 { margin: 0 0 16px; font-size: 16px; }
     .setting-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .setting-row label { font-size: 13px; color: #aaa; }
-    .setting-row input, .setting-row select { background: #333; border: 1px solid #444; border-radius: 4px; color: #e0e0e0; padding: 4px 8px; font-size: 13px; }
+    .setting-row input, .setting-row select { background: #333; border: 1px solid #444; border-radius: 4px; color: #e0e0e0; padding: 4px 8px; font-size: 13px; width: 120px; }
     .preview-box { width: 100%; height: 140px; border-radius: 6px; margin: 12px 0; display: flex; flex-direction: column; border: 1px solid #444; position: relative; overflow: hidden; }
     .preview-box .preview-title { position: absolute; top: 0; left: 0; right: 0; height: 20px; background: rgba(0,0,0,0.3); font-size: 10px; color: rgba(255,255,255,0.5); display: flex; align-items: center; padding: 0 8px; }
     .preview-box .preview-text { flex: 1; padding: 28px 20px 20px; text-indent: 2em; line-height: 1.8; font-size: 13px; overflow: hidden; }
     .setting-actions { display: flex; gap: 8px; margin-top: 16px; }
     .setting-actions button { flex: 1; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
     .setting-actions button.save { background: #2a6; color: #fff; }
+    .setting-actions button.save:hover { background: #3b7; }
     .setting-actions button.close { background: #333; color: #888; }
-    .chapter-list { width: 100%; max-width: 400px; margin-top: 20px; }
-    .chapter-list h3 { margin: 0 0 8px; font-size: 14px; color: #999; }
-    .chapter-item { padding: 8px 12px; background: #222; border-radius: 4px; margin-bottom: 4px; cursor: pointer; font-size: 13px; transition: background 0.2s; }
-    .chapter-item:hover { background: #333; }
-    .chapter-item.active { background: #2a6; }
+    .setting-actions button.close:hover { background: #444; }
+    .setting-group { margin-bottom: 14px; }
+    .setting-group-title { font-size: 12px; color: #2a6; margin-bottom: 6px; font-weight: 600; }
+    .check-list { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+    .check-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #aaa; cursor: pointer; }
+    .check-item input[type=checkbox] { accent-color: #2a6; cursor: pointer; }
+    .check-item:hover { color: #e0e0e0; }
   </style>
 </head>
 <body>
   <div id="app">
-    <h2>Serious Reading</h2>
-    <p class="subtitle">隐蔽阅读器</p>
-    <div class="actions">
-      <button id="btn-open-file" class="primary">打开文件</button>
-      <button id="btn-open-url">输入网址</button>
-      <button id="btn-continue" style="display:none">继续阅读</button>
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div class="logo">Serious <span>Reading</span></div>
+      <button class="primary" id="btn-open">打开文件</button>
+      <button id="btn-url">打开网址</button>
+      <button class="icon-btn" id="btn-settings" title="设置">⚙</button>
     </div>
-    <div id="recent-list"></div>
-    <div id="chapter-list" class="chapter-list" style="display:none"></div>
-    <button class="settings-btn" id="btn-settings">设置</button>
+
+    <!-- Main content -->
+    <div class="main">
+      <div id="bookshelf" class="bookshelf">
+        <div class="bookshelf-empty">打开文件或网址开始阅读</div>
+      </div>
+      <div id="recent-section" class="recent-section"></div>
+    </div>
+
+    <!-- Settings overlay -->
+    <div id="settings-overlay" class="settings-overlay">
+      <div class="settings-content">
+        <h3>阅读设置</h3>
+        <div class="setting-row"><label>窗口宽度</label><input type="number" id="s-width" value="520"></div>
+        <div class="setting-row"><label>窗口高度</label><input type="number" id="s-height" value="780"></div>
+        <div class="setting-row"><label>窗口位置 X</label><input type="number" id="s-winX" value="100"></div>
+        <div class="setting-row"><label>窗口位置 Y</label><input type="number" id="s-winY" value="100"></div>
+        <div class="setting-row"><label>背景色</label><input type="color" id="s-bg" value="#f5f5f5"></div>
+        <div class="setting-row"><label>文字色</label><input type="color" id="s-text" value="#1a1a1a"></div>
+        <div class="setting-row"><label>透明度</label><input type="range" id="s-opacity" min="0.1" max="1" step="0.05" value="1"></div>
+        <div class="setting-row"><label>字体大小</label><input type="number" id="s-fontsize" value="17"></div>
+        <div class="setting-row"><label>行高</label><input type="number" id="s-lineheight" value="1.85" step="0.05"></div>
+        <div class="setting-group">
+          <div class="setting-group-title">翻页方式</div>
+          <div class="check-list">
+            <label class="check-item"><input type="checkbox" id="page-arrow" checked>键盘 ←→</label>
+            <label class="check-item"><input type="checkbox" id="page-wheel" checked>滚轮</label>
+            <label class="check-item"><input type="checkbox" id="page-click" checked>点击左右</label>
+            <label class="check-item"><input type="checkbox" id="page-pgupdn" checked>PageUp/Down</label>
+            <label class="check-item"><input type="checkbox" id="page-space">空格</label>
+            <label class="check-item"><input type="checkbox" id="page-touch" checked>触摸滑动</label>
+          </div>
+        </div>
+        <div class="setting-group">
+          <div class="setting-group-title">隐藏窗口</div>
+          <div class="check-list">
+            <label class="check-item"><input type="checkbox" id="hide-esc" checked>Esc 键</label>
+            <label class="check-item"><input type="checkbox" id="hide-dblclick" checked>双击隐藏</label>
+            <label class="check-item"><input type="checkbox" id="hide-edge" checked>鼠标离开边缘(即时伪装)</label>
+            <label class="check-item"><input type="checkbox" id="hide-rclick">右键</label>
+            <label class="check-item"><input type="checkbox" id="hide-middle">中键</label>
+          </div>
+        </div>
+        <div class="setting-row"><label>显示/隐藏窗口</label><span style="font-size:11px;color:#888;line-height:1.5">utools 输入「显示阅读」或「show」<br>可为该命令配置独立快捷键<br>伪装后双击恢复显示</span></div>
+        <div class="preview-box" id="preview-box">
+          <div class="preview-title">预览</div>
+          <div class="preview-text" id="preview-text">天地玄黄，宇宙洪荒。日月盈昃，辰宿列张。寒来暑往，秋收冬藏。</div>
+        </div>
+        <div class="setting-actions">
+          <button class="save" id="btn-save-settings">保存</button>
+          <button class="close" id="btn-close-settings">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="js/storage.js"></script>
   <script src="js/parser.js"></script>
   <script src="js/chapter.js"></script>
   <script>
-    window.App = {
+    var App = {
       _currentBook: null,
 
       init: function() {
-        this._bindWelcomeActions();
+        this._bindEvents();
         this._loadRecentList();
+        this._tryResumeReading();
         var self = this;
         if (typeof utools !== 'undefined') {
           utools.onPluginEnter(function(action) {
-            self._handlePluginEnter(action);
+            // show_reader: toggle reader window visibility
+            if (action.code === 'show_reader' || action.code === 'reader_stealth') {
+              utools.hideMainWindow(true);
+              if (window.services._readerWin && !window.services._readerWin.isDestroyed()) {
+                try {
+                  // If reader is stealth-hidden, un-stealth it
+                  window.services.sendToReader('toggle-stealth', 'show');
+                  if (!window.services._readerWin.isVisible()) {
+                    window.services._readerWin.show();
+                    window.services._readerWin.focus();
+                  } else if (action.code === 'reader_stealth') {
+                    // reader_stealth: toggle stealth (hide content but keep window)
+                    window.services.sendToReader('toggle-stealth', 'toggle');
+                  } else {
+                    // show_reader: window visible → hide it
+                    window.services._readerWin.hide();
+                  }
+                } catch(e) {}
+              } else {
+                // Reader window doesn't exist, recreate with last reading progress
+                var h = Storage.getReadingHistory();
+                if (h && h.length > 0) {
+                  self._openBook(h[0].filePath, h[0].format);
+                }
+              }
+              return;
+            }
+            // If reader window exists but is hidden, show it first
+            if (window.services && window.services._showReaderWindow()) {
+              utools.hideMainWindow(true);
+              return;
+            }
+            if (action.code === 'reader_open' && action.type === 'file' && action.payload && action.payload.length > 0) {
+              var file = action.payload[0];
+              self._openBook(file.path);
+            } else if (action.code === 'reader_continue') {
+              var h = Storage.getReadingHistory();
+              if (h.length > 0) self._openBook(h[0].filePath, h[0].format);
+            } else {
+              self._loadRecentList();
+              if (self._currentBook) self._showBookshelf();
+            }
           });
         }
       },
 
-      _handlePluginEnter: function(action) {
-        if (action.code === 'reader_open') {
-          if (action.type === 'file' && action.payload && action.payload.length > 0) {
-            var file = action.payload[0];
-            var ext = (file.name || file.path).split('.').pop().toLowerCase();
-            this._openBook(file.path, ext);
+      _bindEvents: function() {
+        var self = this;
+        document.getElementById('btn-open').addEventListener('click', function() { self._openFile(); });
+        document.getElementById('btn-url').addEventListener('click', function() { self._openUrl(); });
+        document.getElementById('btn-settings').addEventListener('click', function() { self._showSettings(); });
+        document.getElementById('btn-save-settings').addEventListener('click', function() { self._saveSettings(); });
+        document.getElementById('btn-close-settings').addEventListener('click', function() { self._hideSettings(); });
+        ['s-bg','s-text','s-opacity','s-fontsize','s-lineheight'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.addEventListener('input', function() { self._updatePreview(); });
+        });
+      },
+
+      _openFile: function() {
+        var self = this;
+        if (typeof utools !== 'undefined' && utools.showOpenDialog) {
+          var files = utools.showOpenDialog({
+            title: '选择阅读文件',
+            filters: [{ name: '支持的格式', extensions: ['txt', 'md', 'epub'] }],
+            properties: ['openFile']
+          });
+          if (files && files[0]) self._openBook(files[0]);
+        }
+      },
+
+      _openUrl: function() {
+        var self = this;
+        var url = prompt('请输入网址:');
+        if (url && url.trim()) {
+          if (window.services && window.services.fetchUrl) {
+            window.services.fetchUrl(url.trim()).then(function(html) {
+              var book = Parser.parseOnline(html, url.trim());
+              if (book) {
+                ChapterManager.load(book);
+                self._currentBook = book;
+                self._showBookshelf();
+                self._openReaderWindow(url.trim(), 'online');
+              }
+            }).catch(function(err) {
+              alert('无法获取: ' + err.message);
+            });
           }
-        } else if (action.code === 'reader_continue') {
-          var history = Storage.getReadingHistory();
-          if (history.length > 0) {
-            this._openBook(history[0].filePath, history[0].format);
-          }
-        } else {
-          this._loadRecentList();
         }
       },
 
       _openBook: function(filePath, format) {
-        var book = null;
-        if (format === 'epub') {
-          if (window.services && window.services.readEpub) book = window.services.readEpub(filePath);
-        } else {
-          var content = window.services ? window.services.readFile(filePath) : null;
-          if (content) book = Parser.parseFile(filePath, content);
+        // If reader window exists with the same book, just show/focus it
+        if (window.services && window.services.isReaderShowingBook && window.services.isReaderShowingBook(filePath)) {
+          window.services.focusReaderWindow();
+          if (typeof utools !== 'undefined') utools.hideMainWindow(true);
+          return;
         }
-        if (!book) return;
-        this._currentBook = book;
+        if (window.services._readerWin && !window.services._readerWin.isDestroyed()) {
+          if (this._currentBook && this._currentBook.filePath === filePath) {
+            if (window.services.focusReaderWindow) window.services.focusReaderWindow();
+            else if (!window.services._readerWin.isVisible()) window.services._readerWin.show();
+            if (typeof utools !== 'undefined') utools.hideMainWindow(true);
+            return;
+          }
+        }
+        var book = null;
+        try {
+          if (format === 'epub' || (filePath && filePath.toLowerCase().endsWith('.epub'))) {
+            if (window.services && window.services.readEpub) book = window.services.readEpub(filePath);
+          } else if (format === 'online') {
+            var content = '';
+            if (window.services && window.services.fetchUrl) content = window.services.fetchUrl(filePath);
+            if (content) book = Parser.parseOnline(filePath, content);
+          } else {
+            var content = '';
+            if (window.services && window.services.readFile) content = window.services.readFile(filePath);
+            if (content) book = Parser.parseFile(filePath, content);
+          }
+        } catch(e) {}
+        if (!book) {
+          utools.showMessageBox({ type: 'error', title: '错误', message: '无法打开: ' + filePath });
+          return;
+        }
         ChapterManager.load(book);
+        this._currentBook = book;
         var saved = Storage.getBookProgress(filePath);
         if (saved && saved.chapterIndex) ChapterManager.setChapter(saved.chapterIndex);
-        this._showChapterList();
-        this._openReaderWindow(filePath, format, saved);
+        this._showBookshelf();
+        this._loadRecentList();
+        this._openReaderWindow(filePath, book.format);
       },
 
-      _showChapterList: function() {
-        var el = document.getElementById('chapter-list');
+      _openReaderWindow: function(filePath, format, extraState) {
+        var settings = Storage.getSettings();
+        var saved = Storage.getBookProgress(filePath);
+        var state = {
+          filePath: filePath,
+          format: format,
+          settings: settings,
+          chapterIndex: ChapterManager.getCurrentIndex(),
+          pageIndex: (saved && saved.pageIndex) ? saved.pageIndex : 0
+        };
+        if (extraState) Object.assign(state, extraState);
+        if (window.services && window.services.sendToReader && window.services._readerWin) {
+          if (window.services._readerState) window.services._readerState = state;
+          if (window.services.focusReaderWindow) window.services.focusReaderWindow();
+          window.services.sendToReader('reading-state', state);
+        } else if (window.services && window.services.createReaderWindow) {
+          window.services.createReaderWindow(state);
+        }
+      },
+
+      _showBookshelf: function() {
+        var el = document.getElementById('bookshelf');
         if (!el) return;
+        var book = this._currentBook;
+        if (!book) { el.innerHTML = '<div class="bookshelf-empty">打开文件或网址开始阅读</div>'; return; }
         var chs = ChapterManager.getChapterList();
-        if (chs.length === 0) { el.style.display = 'none'; return; }
-        var html = '<h3>章节选择</h3>';
+        if (chs.length === 0) { el.innerHTML = '<div class="bookshelf-empty">无章节</div>'; return; }
+        var currentIdx = ChapterManager.getCurrentIndex();
+        var html = '';
+        html += '<div class="book-card open" id="book-card-current">';
+        html += '<div class="book-card-header">';
+        html += '<span class="book-title">' + book.title + '</span>';
+        html += '<span class="book-meta">' + (currentIdx+1) + '/' + book.totalChapters + '</span>';
+        html += '<span class="arrow">▶</span>';
+        html += '</div>';
+        html += '<div class="chapter-panel">';
+        // Chapter jump
+        html += '<div class="chapter-jump">';
+        html += '<label>跳转</label>';
+        html += '<input type="number" id="chapter-jump-input" min="1" max="' + book.totalChapters + '" value="' + (currentIdx+1) + '">';
+        html += '<span class="jump-total">/ ' + book.totalChapters + '</span>';
+        html += '<button id="chapter-jump-btn">Go</button>';
+        html += '</div>';
+        // Chapter list
+        html += '<div class="chapter-list">';
         chs.forEach(function(ch) {
-          html += '<div class="chapter-item" data-index="' + ch.index + '">' + ch.title + '</div>';
+          html += '<div class="chapter-item' + (ch.index === currentIdx ? ' active' : '') + '" data-index="' + ch.index + '">' + ch.title + '</div>';
         });
+        html += '</div>';
+        html += '</div></div>';
         el.innerHTML = html;
-        el.style.display = 'block';
+
         var self = this;
+        // Toggle card
+        el.querySelector('.book-card-header').addEventListener('click', function() {
+          this.parentElement.classList.toggle('open');
+        });
+        // Chapter jump
+        var jumpInput = document.getElementById('chapter-jump-input');
+        var jumpBtn = document.getElementById('chapter-jump-btn');
+        if (jumpBtn) {
+          jumpBtn.addEventListener('click', function() {
+            var idx = parseInt(jumpInput.value) - 1;
+            if (idx >= 0 && idx < book.totalChapters) {
+              ChapterManager.setChapter(idx);
+              self._openReaderWindow(self._currentBook.filePath, self._currentBook.format, { chapterIndex: idx, pageIndex: 0 });
+              self._showBookshelf();
+            }
+          });
+        }
+        if (jumpInput) {
+          jumpInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+              var idx = parseInt(this.value) - 1;
+              if (idx >= 0 && idx < book.totalChapters) {
+                ChapterManager.setChapter(idx);
+                self._openReaderWindow(self._currentBook.filePath, self._currentBook.format, { chapterIndex: idx, pageIndex: 0 });
+                self._showBookshelf();
+              }
+            }
+          });
+        }
+        // Chapter item click
         el.querySelectorAll('.chapter-item').forEach(function(item) {
           item.addEventListener('click', function() {
             var idx = parseInt(this.dataset.index);
             ChapterManager.setChapter(idx);
-            self._openReaderWindow(self._currentBook.filePath, self._currentBook.format, { chapterIndex: idx, scrollPosition: 0 });
+            self._openReaderWindow(self._currentBook.filePath, self._currentBook.format, { chapterIndex: idx, pageIndex: 0 });
+            self._showBookshelf();
           });
         });
-      },
-
-      _openReaderWindow: function(filePath, format, saved) {
-        var settings = Storage.getSettings();
-        var state = {
-          filePath: filePath,
-          format: format,
-          chapterIndex: saved ? saved.chapterIndex : 0,
-          scrollPosition: saved ? saved.scrollPosition : 0,
-          settings: settings
-        };
-        if (window.services && window.services.createReaderWindow) {
-          window.services.createReaderWindow(state);
-        }
-        if (typeof utools !== 'undefined') utools.outPlugin();
-      },
-
-      _openUrl: function(url) {
-        if (!window.services || !window.services.fetchUrl) return;
-        var self = this;
-        window.services.fetchUrl(url).then(function(html) {
-          var book = Parser.parseOnline(html, url);
-          if (book) {
-            ChapterManager.load(book);
-            self._openReaderWindow(url, 'online', null);
-          }
-        }).catch(function(err) {
-          alert('无法获取网页内容: ' + err.message);
-        });
-      },
-
-      _bindWelcomeActions: function() {
-        var self = this;
-        document.getElementById('btn-open-file').addEventListener('click', function() {
-          if (typeof utools !== 'undefined' && utools.showOpenDialog) {
-            var files = utools.showOpenDialog({
-              filters: [{ name: '阅读文件', extensions: ['txt', 'epub', 'md', 'markdown'] }],
-              properties: ['openFile']
-            });
-            if (files && files.length > 0) {
-              var ext = files[0].split('.').pop().toLowerCase();
-              self._openBook(files[0], ext);
-            }
-          }
-        });
-        document.getElementById('btn-open-url').addEventListener('click', function() {
-          var url = prompt('请输入网址:');
-          if (url && url.trim()) self._openUrl(url.trim());
-        });
-        var btnContinue = document.getElementById('btn-continue');
-        var history = Storage.getReadingHistory();
-        if (history.length > 0) {
-          btnContinue.style.display = 'inline-block';
-          btnContinue.textContent = '继续: ' + history[0].title;
-          btnContinue.addEventListener('click', function() {
-            self._openBook(history[0].filePath, history[0].format);
-          });
-        }
-        document.getElementById('btn-settings').addEventListener('click', function() {
-          self._showSettingsPanel();
-        });
+        // Scroll active chapter into view
+        var activeItem = el.querySelector('.chapter-item.active');
+        if (activeItem) activeItem.scrollIntoView({ block: 'center' });
       },
 
       _loadRecentList: function() {
-        var el = document.getElementById('recent-list');
+        var el = document.getElementById('recent-section');
         if (!el) return;
-        var history = Storage.getReadingHistory();
-        if (history.length === 0) return;
-        var html = '<h3 style="margin-bottom:8px;font-size:14px;color:#999;">最近阅读</h3>';
-        history.slice(0, 8).forEach(function(item) {
-          html += '<div class="recent-item" data-path="' + item.filePath + '" data-format="' + item.format + '">';
-          html += '<span class="title">' + item.title + '</span>';
-          html += '<span class="date">' + new Date(item.lastRead).toLocaleDateString() + '</span>';
+        var books = Storage.getReadingHistory();
+        if (!books || books.length === 0) { el.innerHTML = ''; return; }
+        var html = '<div class="section-title">最近阅读</div>';
+        books.slice(0, 10).forEach(function(b) {
+          var d = b.lastRead ? new Date(b.lastRead) : null;
+          var ds = d ? (d.getMonth()+1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0') : '';
+          html += '<div class="recent-item" data-path="' + b.filePath + '" data-format="' + (b.format||'') + '">';
+          html += '<span class="title">' + (b.title || b.filePath) + '</span>';
+          html += '<span class="date">' + ds + '</span>';
           html += '</div>';
         });
         el.innerHTML = html;
+        var self = this;
         el.querySelectorAll('.recent-item').forEach(function(item) {
           item.addEventListener('click', function() {
-            App._openBook(this.dataset.path, this.dataset.format);
+            self._openBook(this.dataset.path, this.dataset.format || undefined);
           });
         });
       },
 
-      _showSettingsPanel: function() {
-        var existing = document.querySelector('.settings-panel');
-        if (existing) { existing.remove(); return; }
-        var settings = Storage.getSettings();
-        var panel = document.createElement('div');
-        panel.className = 'settings-panel';
-        var fr = settings.fr || {};
-        panel.innerHTML =
-          '<div class="settings-content">' +
-          '<h3>阅读设置</h3>' +
-          '<div class="setting-row"><label>默认字体大小</label><input type="range" id="set-fontsize" min="12" max="28" value="' + (fr.fontSize || 17) + '"><span id="set-fontsize-val">' + (fr.fontSize || 17) + '</span></div>' +
-          '<div class="setting-row"><label>默认行距</label><input type="range" id="set-lineheight" min="1.2" max="3.0" step="0.1" value="' + (fr.lineHeight || 1.85) + '"><span id="set-lh-val">' + (fr.lineHeight || 1.85) + '</span></div>' +
-          '<div class="setting-row"><label>背景色</label><input type="color" id="set-bgcolor" value="' + (fr.bgColor || '#f5f5f5') + '"></div>' +
-          '<div class="setting-row"><label>文字色</label><input type="color" id="set-textcolor" value="' + (fr.textColor || '#1a1a1a') + '"></div>' +
-          '<div class="setting-row"><label>透明度</label><input type="range" id="set-opacity" min="0.1" max="1" step="0.05" value="' + (fr.opacity || 1) + '"><span id="set-opacity-val">' + Math.round((fr.opacity || 1)*100) + '%</span></div>' +
-          '<div class="preview-box" id="preview-box" style="background:' + (fr.bgColor || '#f5f5f5') + ';color:' + (fr.textColor || '#1a1a1a') + ';opacity:' + (fr.opacity || 1) + ';">' +
-          '<div class="preview-title">Serious Reading</div>' +
-          '<div class="preview-text">这是一段预览文字，用于展示阅读窗口的实际效果。你可以调整背景色、文字色和透明度来预览。</div>' +
-          '</div>' +
-          '<div class="setting-row"><label>窗口宽度</label><input type="number" id="set-width" min="300" max="1200" step="20" value="' + (settings.floatWidth || 520) + '"></div>' +
-          '<div class="setting-row"><label>窗口高度</label><input type="number" id="set-height" min="400" max="1400" step="20" value="' + (settings.floatHeight || 780) + '"></div>' +
-          '<div class="setting-row"><label>鼠标离开自动隐藏</label><select id="set-edge"><option value="1500"' + ((settings.edgeHideDelay || 1500) === 1500 ? ' selected' : '') + '>1.5秒</option><option value="3000"' + ((settings.edgeHideDelay || 1500) === 3000 ? ' selected' : '') + '>3秒</option><option value="0"' + (settings.edgeHideDelay === 0 ? ' selected' : '') + '>关闭</option></select></div>' +
-          '<div class="setting-row"><label>双击隐藏</label><select id="set-dblclick"><option value="1"' + (settings.dblClickHide !== 0 ? ' selected' : '') + '>开启</option><option value="0"' + (settings.dblClickHide === 0 ? ' selected' : '') + '>关闭</option></select></div>' +
-          '<div class="setting-actions"><button class="save" id="set-save">保存</button><button class="close" id="set-close">关闭</button></div>' +
-          '</div>';
-        document.body.appendChild(panel);
+      _tryResumeReading: function() {
+        var h = Storage.getReadingHistory();
+        if (h && h.length > 0) {
+          var last = h[0];
+          try {
+            var content = '';
+            if (last.format === 'epub') {
+              if (window.services && window.services.readEpub) {
+                var book = window.services.readEpub(last.filePath);
+                if (book) {
+                  ChapterManager.load(book);
+                  this._currentBook = book;
+                  var saved = Storage.getBookProgress(last.filePath);
+                  if (saved && saved.chapterIndex) ChapterManager.setChapter(saved.chapterIndex);
+                  this._showBookshelf();
+                }
+              }
+            } else if (last.format === 'online') {
+              // Skip auto-resume for online
+            } else {
+              if (window.services && window.services.readFile) content = window.services.readFile(last.filePath);
+              if (content) {
+                var book = Parser.parseFile(last.filePath, content);
+                if (book) {
+                  ChapterManager.load(book);
+                  this._currentBook = book;
+                  var saved = Storage.getBookProgress(last.filePath);
+                  if (saved && saved.chapterIndex) ChapterManager.setChapter(saved.chapterIndex);
+                  this._showBookshelf();
+                }
+              }
+            }
+          } catch(e) {}
+        }
+      },
 
-        var updatePreview = function() {
-          var bg = document.getElementById('set-bgcolor').value;
-          var tc = document.getElementById('set-textcolor').value;
-          var op = document.getElementById('set-opacity').value;
-          var preview = document.getElementById('preview-box');
-          preview.style.background = bg;
-          preview.style.color = tc;
-          preview.style.opacity = op;
+      _showSettings: function() {
+        var s = Storage.getSettings();
+        document.getElementById('s-width').value = s.floatWidth || 520;
+        document.getElementById('s-height').value = s.floatHeight || 780;
+        // Load window position from winpos storage
+        try {
+          var posData = utools.dbStorage.getItem('serious_reading/winpos');
+          if (posData && posData.x != null) {
+            document.getElementById('s-winX').value = posData.x;
+            document.getElementById('s-winY').value = posData.y;
+          } else {
+            document.getElementById('s-winX').value = window.screenLeft + 90;
+            document.getElementById('s-winY').value = window.screenTop + 180;
+          }
+        } catch(e) {
+          document.getElementById('s-winX').value = window.screenLeft + 90;
+          document.getElementById('s-winY').value = window.screenTop + 180;
+        }
+        var fr = s.fr || {};
+        document.getElementById('s-bg').value = fr.bgColor || '#f5f5f5';
+        document.getElementById('s-text').value = fr.textColor || '#1a1a1a';
+        document.getElementById('s-opacity').value = fr.opacity != null ? fr.opacity : 1;
+        document.getElementById('s-fontsize').value = fr.fontSize || 17;
+        document.getElementById('s-lineheight').value = fr.lineHeight || 1.85;
+        // Action checkboxes
+        var actions = s.actions || {};
+        var pageActions = actions.page || { arrow: true, wheel: true, click: true, pgupdn: true, space: false, touch: true };
+        var hideActions = actions.hide || { esc: true, dblclick: true, edge: true, rclick: false, middle: false };
+        var showActions = actions.show || { hover: true, click: false, esc: false };
+        this._setCheck('page-arrow', pageActions.arrow);
+        this._setCheck('page-wheel', pageActions.wheel);
+        this._setCheck('page-click', pageActions.click);
+        this._setCheck('page-pgupdn', pageActions.pgupdn);
+        this._setCheck('page-space', pageActions.space);
+        this._setCheck('page-touch', pageActions.touch);
+        this._setCheck('hide-esc', hideActions.esc);
+        this._setCheck('hide-dblclick', hideActions.dblclick);
+        this._setCheck('hide-edge', hideActions.edge);
+        this._setCheck('hide-rclick', hideActions.rclick);
+        this._setCheck('hide-middle', hideActions.middle);
+        this._updatePreview();
+        document.getElementById('settings-overlay').classList.add('show');
+      },
+
+      _setCheck: function(id, val) {
+        var el = document.getElementById(id);
+        if (el) el.checked = !!val;
+      },
+
+      _getCheck: function(id) {
+        var el = document.getElementById(id);
+        return el ? el.checked : false;
+      },
+
+      _hideSettings: function() {
+        document.getElementById('settings-overlay').classList.remove('show');
+      },
+
+      _updatePreview: function() {
+        var bg = document.getElementById('s-bg').value;
+        var text = document.getElementById('s-text').value;
+        var opacity = document.getElementById('s-opacity').value;
+        var fs = document.getElementById('s-fontsize').value;
+        var lh = document.getElementById('s-lineheight').value;
+        var box = document.getElementById('preview-box');
+        var pt = document.getElementById('preview-text');
+        box.style.background = bg;
+        pt.style.color = text;
+        pt.style.opacity = opacity;
+        pt.style.fontSize = (parseInt(fs) * 0.76) + 'px';
+        pt.style.lineHeight = lh;
+      },
+
+      _saveSettings: function() {
+        var s = Storage.getSettings();
+        s.floatWidth = parseInt(document.getElementById('s-width').value) || 520;
+        s.floatHeight = parseInt(document.getElementById('s-height').value) || 780;
+        // Save window position
+        var winX = parseInt(document.getElementById('s-winX').value);
+        var winY = parseInt(document.getElementById('s-winY').value);
+        if (winX > 10 && winX < 8000 && winY > 10 && winY < 8000) {
+          utools.dbStorage.setItem('serious_reading/winpos', {
+            x: winX, y: winY,
+            width: s.floatWidth, height: s.floatHeight
+          });
+        }
+        s.fr = s.fr || {};
+        s.fr.bgColor = document.getElementById('s-bg').value;
+        s.fr.textColor = document.getElementById('s-text').value;
+        s.fr.opacity = parseFloat(document.getElementById('s-opacity').value);
+        s.fr.fontSize = parseInt(document.getElementById('s-fontsize').value) || 17;
+        s.fr.lineHeight = parseFloat(document.getElementById('s-lineheight').value) || 1.85;
+        // Save action settings
+        s.actions = {
+          page: { arrow: this._getCheck('page-arrow'), wheel: this._getCheck('page-wheel'), click: this._getCheck('page-click'), pgupdn: this._getCheck('page-pgupdn'), space: this._getCheck('page-space'), touch: this._getCheck('page-touch') },
+          hide: { esc: this._getCheck('hide-esc'), dblclick: this._getCheck('hide-dblclick'), edge: this._getCheck('hide-edge'), rclick: this._getCheck('hide-rclick'), middle: this._getCheck('hide-middle') }
         };
-
-        document.getElementById('set-fontsize').addEventListener('input', function() {
-          document.getElementById('set-fontsize-val').textContent = this.value;
-        });
-        document.getElementById('set-lineheight').addEventListener('input', function() {
-          document.getElementById('set-lh-val').textContent = this.value;
-        });
-        document.getElementById('set-opacity').addEventListener('input', function() {
-          document.getElementById('set-opacity-val').textContent = Math.round(parseFloat(this.value)*100) + '%';
-          updatePreview();
-        });
-        document.getElementById('set-bgcolor').addEventListener('input', updatePreview);
-        document.getElementById('set-textcolor').addEventListener('input', updatePreview);
-
-        document.getElementById('set-save').addEventListener('click', function() {
-          settings.fr = settings.fr || {};
-          settings.fr.fontSize = parseInt(document.getElementById('set-fontsize').value);
-          settings.fr.lineHeight = parseFloat(document.getElementById('set-lineheight').value);
-          settings.fr.bgColor = document.getElementById('set-bgcolor').value;
-          settings.fr.textColor = document.getElementById('set-textcolor').value;
-          settings.fr.opacity = parseFloat(document.getElementById('set-opacity').value);
-          settings.floatWidth = parseInt(document.getElementById('set-width').value);
-          settings.floatHeight = parseInt(document.getElementById('set-height').value);
-          settings.edgeHideDelay = parseInt(document.getElementById('set-edge').value);
-          settings.dblClickHide = parseInt(document.getElementById('set-dblclick').value);
-          Storage.saveSettings(settings);
-          panel.remove();
-        });
-        document.getElementById('set-close').addEventListener('click', function() { panel.remove(); });
+        Storage.saveSettings(s);
+        this._hideSettings();
       }
     };
+
     document.addEventListener('DOMContentLoaded', function() { App.init(); });
   </script>
 </body>

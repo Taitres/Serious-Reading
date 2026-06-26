@@ -1,7 +1,14 @@
 {
-  "main": "index.html",
+  "name": "serious-reading",
+  "title": "Serious Reading",
+  "description": "隐私小说阅读器插件，支持TXT/MD/EPUB格式，具备老板键、模拟器模式等隐藏功能",
+  "version": "1.0.0",
+  "development": {
+    "main": "src/index.html"
+  },
+  "main": "src/index.html",
   "logo": "logo.png",
-  "preload": "preload.js",
+  "preload": "src/preload.js",
   "pluginSetting": {
     "single": true,
     "height": 500
@@ -9,18 +16,28 @@
   "features": [
     {
       "code": "reader",
-      "explain": "隐蔽阅读器",
-      "cmds": ["阅读", "看书", "serious"]
+      "explain": "打开阅读器",
+      "cmds": [
+        "阅读",
+        "书架",
+        "serious"
+      ]
     },
     {
       "code": "reader_continue",
       "explain": "继续阅读",
-      "cmds": ["继续阅读", "阅读 继续"]
+      "cmds": [
+        "继续阅读",
+        "阅读 继续"
+      ]
     },
     {
       "code": "reader_stealth",
-      "explain": "切换伪装模式",
-      "cmds": ["阅读 隐藏", "老板来了"]
+      "explain": "切换模拟器模式",
+      "cmds": [
+        "阅读 暂停",
+        "假装工作完了"
+      ]
     },
     {
       "code": "reader_open",
@@ -29,8 +46,21 @@
         {
           "type": "files",
           "label": "阅读文件",
-          "extensions": ["txt", "epub", "md", "markdown"]
+          "extensions": [
+            "txt",
+            "epub",
+            "md",
+            "markdown"
+          ]
         }
+      ]
+    },
+    {
+      "code": "show_reader",
+      "explain": "显示/隐藏阅读器",
+      "cmds": [
+        "显示阅读器",
+        "show"
       ]
     }
   ]

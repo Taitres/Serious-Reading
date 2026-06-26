@@ -1,18 +1,13 @@
 {
   "name": "serious-reading",
   "version": "1.0.0",
-  "description": "",
+  "description": "隐蔽阅读器 - Serious Reading utools插件",
   "main": "preload.js",
-  "directories": {
-    "doc": "docs"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
+  "scripts": {
+    "pack": "node pack.js"
+  },
   "dependencies": {
     "adm-zip": "^0.5.17",
     "iconv-lite": "^0.7.2"

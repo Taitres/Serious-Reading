@@ -3,6 +3,124 @@ const path = require('path');
 const https = require('https');
 
 window.services = {
+  _readerWin: null,
+  _readerState: null,
+  _readerMoveTimer: null,
+
+  _bookKey: function(filePath) {
+    if (!filePath) return '';
+    try {
+      if (/^https?:\/\//i.test(filePath)) return filePath;
+      return path.resolve(filePath).toLowerCase();
+    } catch(e) {
+      return String(filePath).toLowerCase();
+    }
+  },
+
+  _getReaderBookKey: function() {
+    return this._readerState && this._readerState.filePath ? this._bookKey(this._readerState.filePath) : '';
+  },
+
+  isReaderShowingBook: function(filePath) {
+    return !!(this._readerWin && !this._readerWin.isDestroyed() && this._getReaderBookKey() === this._bookKey(filePath));
+  },
+
+  focusReaderWindow: function() {
+    if (!this._readerWin || this._readerWin.isDestroyed()) return false;
+    try {
+      this.sendToReader('toggle-stealth', 'show');
+      if (!this._readerWin.isVisible()) this._readerWin.show();
+      this._readerWin.focus();
+      return true;
+    } catch(e) {
+      return false;
+    }
+  },
+
+  _readSavedWindowBounds: function(settings) {
+    var bounds = {
+      width: (settings && settings.floatWidth) || 520,
+      height: (settings && settings.floatHeight) || 780,
+      x: null,
+      y: null
+    };
+    try {
+      var posData = utools.dbStorage.getItem('serious_reading/winpos');
+      if (posData) {
+        if (posData.width > 120 && posData.width < 8000) bounds.width = posData.width;
+        if (posData.height > 120 && posData.height < 8000) bounds.height = posData.height;
+        if (posData.x != null && posData.y != null && posData.x > -8000 && posData.x < 8000 && posData.y > -8000 && posData.y < 8000) {
+          bounds.x = posData.x;
+          bounds.y = posData.y;
+        }
+      }
+    } catch(e) {}
+    if (bounds.x == null) {
+      bounds.x = window.screenLeft + 90;
+      bounds.y = window.screenTop + 180;
+    }
+    return bounds;
+  },
+
+  _saveReaderWindowBounds: function(win) {
+    try {
+      if (!win || win.isDestroyed()) return;
+      var pos = win.getPosition();
+      var size = win.getSize();
+      var x = pos[0], y = pos[1], width = size[0], height = size[1];
+      if (width <= 120 || width > 8000 || height <= 120 || height > 8000) return;
+      if (x < -8000 || x > 8000 || y < -8000 || y > 8000) return;
+      utools.dbStorage.setItem('serious_reading/winpos', { x: x, y: y, width: width, height: height });
+
+      var settings = utools.dbStorage.getItem('serious_reading/settings') || {};
+      settings.floatWidth = width;
+      settings.floatHeight = height;
+      utools.dbStorage.setItem('serious_reading/settings', settings);
+    } catch(e) {}
+  },
+
+  _bindReaderWindowBounds: function(win) {
+    var self = this;
+    var scheduleSave = function() {
+      clearTimeout(self._readerMoveTimer);
+      self._readerMoveTimer = setTimeout(function() {
+        self._saveReaderWindowBounds(win);
+      }, 300);
+    };
+    try { win.on('move', scheduleSave); } catch(e) {}
+    try { win.on('resize', scheduleSave); } catch(e) {}
+    try { win.on('resized', scheduleSave); } catch(e) {}
+    try { win.on('moved', scheduleSave); } catch(e) {}
+  },
+
+  _showReaderWindow: function() {
+    var self = this;
+    if (self._readerWin && !self._readerWin.isDestroyed()) {
+      try {
+        self.sendToReader('toggle-stealth', 'show');
+        if (!self._readerWin.isVisible()) {
+          self._readerWin.show();
+        }
+        self._readerWin.focus();
+        return true;
+      } catch(e) {}
+    }
+    return false;
+  },
+
+  // When plugin is triggered, show hidden reader window if exists
+  _onPluginEnter: function() {
+    if (this._readerWin && !this._readerWin.isDestroyed()) {
+      try {
+        this.sendToReader('toggle-stealth', 'show');
+        if (!this._readerWin.isVisible()) {
+          this._readerWin.show();
+        }
+        this._readerWin.focus();
+      } catch(e) {}
+    }
+  },
+
   readFile: (filePath) => {
     try {
       var buf = fs.readFileSync(filePath);
@@ -148,11 +266,23 @@ window.services = {
     }
   },
   createReaderWindow: function(state) {
+    window.services._readerState = state;
+    if (window.services._readerWin && !window.services._readerWin.isDestroyed()) {
+      try {
+        window.services.sendToReader('toggle-stealth', 'show');
+        if (!window.services._readerWin.isVisible()) window.services._readerWin.show();
+        window.services._readerWin.focus();
+        window.services._readerWin.webContents.send('reading-state', state);
+      } catch(e) {}
+      return window.services._readerWin;
+    }
     var settings = state.settings || {};
-    var fr = settings.fr || {};
+    var bounds = window.services._readSavedWindowBounds(settings);
     var win = utools.createBrowserWindow('reader.html', {
-      width: settings.floatWidth || 520,
-      height: settings.floatHeight || 780,
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
       title: '',
       transparent: true,
       frame: false,
@@ -163,7 +293,7 @@ window.services = {
       hasShadow: false,
       thickFrame: false,
       roundedCorners: false,
-      movable: false,
+      movable: true,
       minimizable: false,
       maximizable: false,
       closeable: true,
@@ -173,10 +303,55 @@ window.services = {
     }, function() {
       win.webContents.send('reading-state', state);
       try { win.setAlwaysOnTop(true, 'screen-saver'); } catch(e) {}
+      window.services._saveReaderWindowBounds(win);
     });
+    window.services._bindReaderWindowBounds(win);
+    win.on('close', function() { window.services._saveReaderWindowBounds(win); });
+    win.on('closed', function() {
+      window.services._saveReaderWindowBounds(win);
+      window.services._readerWin = null;
+      window.services._readerState = null;
+    });
+    window.services._readerWin = win;
     return win;
+  },
+  sendToReader: function(channel, data) {
+    if (window.services._readerWin && !window.services._readerWin.isDestroyed()) {
+      try { window.services._readerWin.webContents.send(channel, data); } catch(e) {}
+    }
   }
 };
 
 var { ipcRenderer } = require('electron');
 window._ipcRenderer = ipcRenderer;
+
+// Handle IPC from reader window (forwarded through reader_preload.js)
+ipcRenderer.on('hide-reader-window', function() {
+  var win = window.services._readerWin;
+  if (win && !win.isDestroyed()) {
+    try { window.services._saveReaderWindowBounds(win); } catch(e) {}
+    try { win.hide(); } catch(e) {}
+  }
+});
+
+ipcRenderer.on('save-reader-bounds', function(event, data) {
+  // Prefer bounds data from child window (using screenLeft/screenTop), fall back to proxy
+  if (data && data.x != null && data.y != null && data.width > 0 && data.height > 0) {
+    try {
+      utools.dbStorage.setItem('serious_reading/winpos', { x: data.x, y: data.y, width: data.width, height: data.height });
+      var settings = utools.dbStorage.getItem('serious_reading/settings') || {};
+      settings.floatWidth = data.width;
+      settings.floatHeight = data.height;
+      utools.dbStorage.setItem('serious_reading/settings', settings);
+    } catch(e) {}
+  } else {
+    var win = window.services._readerWin;
+    if (win && !win.isDestroyed()) {
+      try { window.services._saveReaderWindowBounds(win); } catch(e) {}
+    }
+  }
+});
+
+ipcRenderer.on('toggle-stealth', function(event, action) {
+  window.services.sendToReader('toggle-stealth', action);
+});

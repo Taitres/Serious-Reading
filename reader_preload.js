@@ -55,9 +55,7 @@ window.services = {
       var manifest = {};
       var manifestRegex = /<item\s+[^>]*id="([^"]+)"[^>]*href="([^"]+)"[^>]*media-type="([^"]+)"[^>]*/g;
       var mMatch;
-      while ((mMatch = manifestRegex.exec(opfXml)) !== null) {
-        manifest[mMatch[1]] = { href: mMatch[2], type: mMatch[3] };
-      }
+      while ((mMatch = manifestRegex.exec(opfXml)) !== null) { manifest[mMatch[1]] = { href: mMatch[2], type: mMatch[3] }; }
       var spineItems = [];
       var spineRegex = /<itemref\s+idref="([^"]+)"/g;
       var sMatch;
@@ -72,9 +70,7 @@ window.services = {
           if (ncxXml) {
             var navPointRegex = /<navPoint[^>]*playOrder="(\d+)"[^>]*>[\s\S]*?<text>([^<]+)<\/text>[\s\S]*?<content\s+src="([^"]+)"/g;
             var npMatch;
-            while ((npMatch = navPointRegex.exec(ncxXml)) !== null) {
-              toc.push({ order: parseInt(npMatch[1]), title: npMatch[2], src: npMatch[3] });
-            }
+            while ((npMatch = navPointRegex.exec(ncxXml)) !== null) { toc.push({ order: parseInt(npMatch[1]), title: npMatch[2], src: npMatch[3] }); }
           }
         }
       }
@@ -105,3 +101,34 @@ window.services = {
 
 const { ipcRenderer } = require('electron');
 window._ipcRenderer = ipcRenderer;
+
+// Track parent window ID for sendTo communication
+var _parentId = null;
+
+// Wrap ipcRenderer.on to capture parentId from incoming messages
+var _origOn = ipcRenderer.on.bind(ipcRenderer);
+ipcRenderer.on = function(channel, handler) {
+  _origOn(channel, function(event) {
+    if (event.senderId && event.senderId !== 0) _parentId = event.senderId;
+    handler.apply(null, arguments);
+  });
+};
+
+// Handle toggle-stealth from parent - apply directly to FR in reader.html
+ipcRenderer.on('toggle-stealth', function(event, action) {
+  try {
+    if (typeof FR !== 'undefined') {
+      if (action === 'show') { if (FR._stealthHidden) FR._stealthShow(); }
+      else if (action === 'hide') { if (!FR._stealthHidden) FR._stealthHide(); }
+      else { if (FR._stealthHidden) FR._stealthShow(); else FR._stealthHide(); }
+    }
+  } catch(e) {}
+});
+
+// Expose relay functions on window for reader.html to call directly
+window._sendToParent = function(channel, data) {
+  try {
+    if (_parentId) ipcRenderer.sendTo(_parentId, channel, data);
+    else ipcRenderer.send(channel, data);
+  } catch(e) {}
+};

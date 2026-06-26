@@ -1,0 +1,51 @@
+{
+  "name": "serious-reading-zt",
+  "title": "Serious Reading",
+  "description": "隐私小说阅读器，支持 TXT/EPUB/PDF，具备透明留窗伪装模式、老板键、自动翻页等隐藏功能",
+  "version": "1.0.0",
+  "main": "dist/index.html",
+  "logo": "logo.png",
+  "preload": "preload/main.js",
+  "development": {
+    "main": "http://localhost:5173/index.html",
+    "preload": "preload/main.js",
+    "logo": "logo.png"
+  },
+  "pluginSetting": {
+    "single": true,
+    "height": 660
+  },
+  "features": [
+    {
+      "code": "reader",
+      "explain": "打开阅读器书架",
+      "cmds": ["阅读", "书架", "serious"]
+    },
+    {
+      "code": "reader_continue",
+      "explain": "继续上次阅读",
+      "cmds": ["继续阅读", "阅读 继续"]
+    },
+    {
+      "code": "reader_open",
+      "explain": "打开文件阅读",
+      "cmds": [
+        {
+          "type": "files",
+          "label": "阅读文件",
+          "extensions": ["txt", "epub", "pdf"]
+        }
+      ]
+    },
+    {
+      "code": "show_reader",
+      "explain": "显示阅读窗",
+      "cmds": ["显示阅读器", "show"]
+    },
+    {
+      "code": "toggle_reader",
+      "explain": "切换阅读窗显隐（可绑全局快捷键）",
+      "cmds": ["切换阅读器", "toggle reader"]
+    }
+  ]
+}
