@@ -9,7 +9,7 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 
-const PAGE_KEYS: { key: keyof Settings['page']; label: string }[] = [
+const PAGE_KEYS: { key: 'arrow' | 'wheel' | 'click' | 'pgupdn' | 'space' | 'touch'; label: string }[] = [
   { key: 'arrow', label: '键盘 ←→' },
   { key: 'wheel', label: '滚轮' },
   { key: 'click', label: '点击左右' },
@@ -110,6 +110,11 @@ export function SettingsDialog(props: {
                   {p.label}
                 </label>
               ))}
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-sm">
+              <span className="text-muted-foreground">翻页过渡</span>
+              <Button size="sm" variant={draft.page.transition === 'none' ? 'default' : 'outline'} onClick={() => patchPage({ transition: 'none' })}>无动画</Button>
+              <Button size="sm" variant={draft.page.transition === 'slide' ? 'default' : 'outline'} onClick={() => patchPage({ transition: 'slide' })}>滑动</Button>
             </div>
           </Section>
 

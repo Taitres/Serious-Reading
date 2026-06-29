@@ -38,7 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
     fontFamily: 'default',
     keepFormat: false,
   },
-  page: { arrow: true, wheel: true, click: true, pgupdn: true, space: false, touch: true },
+  page: { arrow: true, wheel: true, click: true, pgupdn: true, space: false, touch: true, transition: 'none' },
   hide: {
     stealthHide: ['escape', 'dblclick', 'mouseleave'],
     stealthShow: ['middleClick'],

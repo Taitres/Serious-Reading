@@ -29,6 +29,9 @@ export default function App() {
     setRecents(getHistory())
     refreshCovers()
     bindFeatures()
+    const onShelfChange = () => { setShelf(getShelf()); refreshCovers() }
+    window.addEventListener('sr:shelf-changed', onShelfChange)
+    return () => window.removeEventListener('sr:shelf-changed', onShelfChange)
   }, [])
 
   function refreshCovers() {
@@ -46,6 +49,8 @@ export default function App() {
     const zt = window.ztools
     if (!zt) return
     zt.onPluginEnter((p) => {
+      setShelf(getShelf())
+      refreshCovers()
       const code = p.code
       if (code === 'reader_open' && p.type === 'files' && p.payload?.length) {
         openFile(p.payload[0].path)

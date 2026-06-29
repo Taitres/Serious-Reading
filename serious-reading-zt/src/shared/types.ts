@@ -70,6 +70,8 @@ export interface PageActions {
   pgupdn: boolean
   space: boolean
   touch: boolean
+  /** 翻页过渡：'none' 无动画，'slide' 滑动 */
+  transition: 'none' | 'slide'
 }
 
 /** 阅读窗外观配色（独立于 UI 明暗主题） */

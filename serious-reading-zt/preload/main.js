@@ -6,6 +6,8 @@
 const fs = require('fs')
 const path = require('path')
 const { ipcRenderer } = require('electron')
+const DB_PREFIX = 'serious_reading/'
+const BOOKS_DOC_ID = DB_PREFIX + 'books'
 
 // 第三方依赖放 preload/node_modules，原样提交，不压缩
 const iconv = require('./node_modules/iconv-lite')
@@ -186,6 +188,8 @@ window.services = {
       ? 'http://localhost:5173/reader.html'
       : 'dist/reader.html'
 
+    const readerPreloadPath = path.join(__dirname, 'reader.js')
+
     const win = ztools.createBrowserWindow(readerUrl, {
       width: w,
       height: h,
@@ -205,18 +209,20 @@ window.services = {
       minimizable: false,
       maximizable: false,
       closeable: true,
-      webPreferences: { preload: 'preload/reader.js' },
+      webPreferences: { preload: readerPreloadPath },
     }, function () {
+      if (!win) return
       win.webContents.send('sr:reading-state', state)
       try { win.setAlwaysOnTop(true, 'screen-saver') } catch (e) {}
     })
+    if (!win) { console.warn('[SR] createReaderWindow returned null (readerUrl=' + readerUrl + ')'); return null }
 
     // 保存窗口位置/尺寸
     let saveTimer = null
     const scheduleSave = function () {
       clearTimeout(saveTimer)
       saveTimer = setTimeout(function () {
-        if (!win || win.isDestroyed()) return
+        if (!win || win.isDestroyed()) { try { console.log('[SR] win destroyed, skip save') } catch(e) {}; return }
         try {
           const p = win.getPosition()
           const s = win.getSize()
@@ -265,6 +271,28 @@ window.services = {
 
 window._ipcRenderer = ipcRenderer
 
+// 阅读窗 → 主窗：保存进度 + 更新书架 lastChapter
+ipcRenderer.on('sr:save-progress', function (e, pg) {
+  if (!pg || !pg.filePath) return
+  // 保存 ReadingProgress
+  try { ztools.dbStorage.setItem(DB_PREFIX + 'progress/' + pg.filePath, pg) } catch (e2) {}
+  // 更新书架书籍的 lastChapter
+  try {
+    const doc = ztools.db.get(BOOKS_DOC_ID)
+    if (doc && Array.isArray(doc.data)) {
+      const idx = doc.data.findIndex(function (b) { return b.path === pg.filePath })
+      if (idx >= 0) {
+        doc.data[idx].lastChapter = pg.chapterIndex
+        doc.data[idx].progress = pg.charOffset
+        doc.data[idx].lastRead = Date.now()
+        ztools.db.put(doc)
+      }
+    }
+  } catch (e2) {}
+  // 通知渲染进程刷新书架
+  try { window.dispatchEvent(new CustomEvent('sr:shelf-changed')) } catch (e3) {}
+})
+
 // 阅读窗 → 主窗：真隐藏
 ipcRenderer.on('sr:hide-reader', function () {
   const win = window.services._readerWin
@@ -299,7 +327,7 @@ ipcRenderer.on('sr:win-delta', function (e, data) {
     if (type.includes('w')) { width = b.width - dx; x = b.x + dx }
     if (type.includes('s')) height = b.height + dy
     if (type.includes('n')) { height = b.height - dy; y = b.y + dy }
-    const MINW = 140, MINH = 100
+    const MINW = 100, MINH = 50
     if (width < MINW) { if (type.includes('w')) x = b.x + b.width - MINW; width = MINW }
     if (height < MINH) { if (type.includes('n')) y = b.y + b.height - MINH; height = MINH }
   }

@@ -13,6 +13,11 @@ export default defineConfig({
     },
   },
   base: './',
+  server: {
+    port: 5173,
+    strictPort: true,
+    hmr: process.env.VITE_HMR !== '1' ? false : undefined,
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

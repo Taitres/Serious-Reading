@@ -27,9 +27,16 @@ export function BookCard(props: {
         ) : (
           <span className="line-clamp-4 px-2 text-center text-sm font-medium opacity-80">{props.book.name}</span>
         )}
-        {props.progress > 0 && (
-          <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] text-white">{Math.min(100, props.progress)}%</span>
-        )}
+        <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between gap-1">
+          {props.book.lastChapter != null && (
+            <span className="truncate rounded bg-black/60 px-1 text-[10px] text-white">
+              第{props.book.totalChapters ? `${props.book.lastChapter + 1}/${props.book.totalChapters}` : `${props.book.lastChapter + 1}`}章
+            </span>
+          )}
+          {props.progress > 0 && (
+            <span className="shrink-0 rounded bg-black/60 px-1 text-[10px] text-white">{Math.min(100, props.progress)}%</span>
+          )}
+        </div>
       </button>
       <div className="mt-1 truncate text-xs text-muted-foreground">{props.book.name}</div>
       <div className="absolute right-1 top-1 opacity-0 transition group-hover:opacity-100">

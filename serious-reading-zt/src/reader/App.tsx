@@ -85,7 +85,7 @@ export default function App() {
     const measure = measureRef.current
     if (!measure) return
     const pageH = window.innerHeight - 16
-    const pageW = window.innerWidth - 16
+    const pageW = window.innerWidth - 24
     measure.style.width = pageW + 'px'
     measure.style.fontSize = settings.reader.fontSize + 'px'
     measure.style.lineHeight = String(settings.reader.lineHeight)
@@ -97,10 +97,12 @@ export default function App() {
         const span = document.createElement('span')
         span.textContent = node.textContent
         measure.replaceChild(span, node)
-        nodes.push({ height: span.offsetHeight, html: span.outerHTML })
+        const cs = getComputedStyle(span)
+        nodes.push({ height: span.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom), html: span.outerHTML })
       } else if (node.nodeType === 1) {
         const el = node as HTMLElement
-        nodes.push({ height: el.offsetHeight, html: el.outerHTML })
+        const cs = getComputedStyle(el)
+        nodes.push({ height: el.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom), html: el.outerHTML })
       }
     })
     const result: string[] = []
@@ -114,7 +116,7 @@ export default function App() {
     if (cur) result.push(cur)
     measure.innerHTML = ''
     setPages(result.length ? result : ['<p style="text-align:center;opacity:.4">本章无内容</p>'])
-    setPageIndex((p) => Math.min(p, result.length - 1))
+    setPageIndex((p) => p === -1 ? result.length - 1 : Math.min(p, result.length - 1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterHtml, settings.reader.fontSize, settings.reader.lineHeight, resizeN])
 
@@ -151,6 +153,7 @@ export default function App() {
     if (!book || book.format === 'pdf') return
     if (chapterIdx < book.totalChapters - 1) {
       const ni = chapterIdx + 1
+      setPages(['<p style="padding-top:40vh;text-align:center;opacity:.4">…</p>'])
       setChapterIdx(ni)
       setCharOffset(book.chapters[ni]?.charOffset ?? 0)
       setPageIndex(0)
@@ -160,9 +163,10 @@ export default function App() {
     if (!book || book.format === 'pdf') return
     if (chapterIdx > 0) {
       const pi = chapterIdx - 1
+      setPages(['<p style="padding-top:40vh;text-align:center;opacity:.4">…</p>'])
       setChapterIdx(pi)
       setCharOffset(book.chapters[pi]?.charOffset ?? 0)
-      setPageIndex(0)
+      setPageIndex(-1)
     }
   }
   function goChapter(idx: number) {
@@ -184,6 +188,7 @@ export default function App() {
         pageIndex, charOffset, timestamp: Date.now(),
       }
       saveProgress(pg)
+      sendParent?.('sr:save-progress', pg)
     }, 400)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,15 +349,18 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* 分页内容条：绝对定位单页切换，避免 flex 子项被压缩导致竖排 */}
+            {/* 分页内容条：绝对定位单页切换 */}
             <div
-              className="relative h-full w-full transition-transform duration-200"
-              style={{ transform: `translateX(-${pageIndex * 100}%)` }}
+              className="relative h-full w-full"
+              style={{
+                transform: `translateX(-${pageIndex * 100}%)`,
+                transition: settings.page.transition === 'slide' ? 'transform 200ms ease' : 'none',
+              }}
             >
               {pages.map((p, i) => (
                 <div
                   key={i}
-                  className="absolute left-0 top-0 h-full overflow-y-auto px-3 py-2 select-none"
+                  className="absolute left-0 top-0 h-full overflow-hidden px-3 py-2 select-none"
                   style={{ width: '100%', left: `${i * 100}%` }}
                   dangerouslySetInnerHTML={{ __html: p }}
                 />
