@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Settings, TriggerKey, HideActions } from '@/shared/types'
 import { TRIGGER_OPTIONS, detectConflicts, DEFAULT_SETTINGS } from '@/shared/constants'
 import { saveSettings } from '@/shared/storage'
@@ -73,8 +73,8 @@ export function SettingsDialog(props: {
           {/* 阅读外观 */}
           <Section title="阅读外观">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="背景色"><input type="color" value={draft.reader.bgColor} onChange={(e) => patchReader({ bgColor: e.target.value })} className="h-9 w-full rounded border" /></Field>
-              <Field label="文字色"><input type="color" value={draft.reader.textColor} onChange={(e) => patchReader({ textColor: e.target.value })} className="h-9 w-full rounded border" /></Field>
+              <Field label="背景色"><ColorPicker value={draft.reader.bgColor} onChange={(v) => patchReader({ bgColor: v })} /></Field>
+              <Field label="文字色"><ColorPicker value={draft.reader.textColor} onChange={(v) => patchReader({ textColor: v })} /></Field>
               <Field label={`透明度 ${Math.round(draft.reader.opacity * 100)}%`}>
                 <Slider min={10} max={100} step={5} value={[draft.reader.opacity * 100]} onValueChange={(v) => patchReader({ opacity: v[0] / 100 })} />
               </Field>
@@ -171,4 +171,90 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   )
+}
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null)
+  const [hex, setHex] = useState(value)
+  const [picking, setPicking] = useState(false)
+  const [screenImg, setScreenImg] = useState<string | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  useEffect(() => { setHex(value) }, [value])
+
+  useEffect(() => {
+    if (!screenImg || !canvasRef.current) return
+    const img = new Image()
+    img.onload = () => {
+      const el = canvasRef.current!
+      el.width = img.width; el.height = img.height
+      el.getContext('2d')?.drawImage(img, 0, 0)
+    }
+    img.src = screenImg
+  }, [screenImg])
+
+  function startPick() {
+    const zt = window.ztools
+    if (!zt?.screenCapture) { ref.current?.click(); return }
+    zt.hideMainWindow?.(true)
+    setTimeout(() => {
+      try {
+        zt.screenCapture!((img) => {
+          zt.showMainWindow?.()
+          if (typeof img === 'string' && img.startsWith('data:')) {
+            setScreenImg(img)
+            setPicking(true)
+          } else {
+            ref.current?.click()
+          }
+        })
+      } catch {
+        zt.showMainWindow?.()
+        ref.current?.click()
+      }
+    }, 300)
+  }
+
+  function handlePickClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    const sx = canvasRef.current.width / rect.width
+    const sy = canvasRef.current.height / rect.height
+    const x = Math.floor((e.clientX - rect.left) * sx)
+    const y = Math.floor((e.clientY - rect.top) * sy)
+    const ctx = canvasRef.current.getContext('2d')
+    if (!ctx) return
+    const px = ctx.getImageData(x, y, 1, 1).data
+    const c = '#' + [px[0], px[1], px[2]].map((v) => v.toString(16).padStart(2, '0')).join('')
+    onChange(c); setHex(c); setPicking(false); setScreenImg(null)
+  }
+
+  return (
+    <>
+      {picking && screenImg && (
+        <div className="fixed inset-0 z-[9999] cursor-crosshair" onClick={handlePickClick} onKeyDown={(e) => { if (e.key === 'Escape') { setPicking(false); setScreenImg(null) } }}>
+          <canvas
+            ref={canvasRef}
+            className="h-full w-full"
+          />
+          <div className="pointer-events-none fixed top-4 left-1/2 -translate-x-1/2 rounded bg-black/70 px-4 py-2 text-sm text-white">点击任意位置取色 · Esc 取消</div>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <div
+          className="h-9 w-9 shrink-0 rounded border cursor-pointer flex items-center justify-center text-[10px] font-bold"
+          style={{ background: hex, color: isLight(hex) ? '#000' : '#fff' }}
+          onClick={startPick}
+          title="点击全屏取色"
+        >
+          吸
+        </div>
+        <input ref={ref} type="color" value={hex} onChange={(e) => { onChange(e.target.value); setHex(e.target.value) }} className="h-9 flex-1 rounded border" />
+      </div>
+    </>
+  )
+}
+
+function isLight(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16)
+  return (r * 299 + g * 587 + b * 114) / 1000 > 128
 }

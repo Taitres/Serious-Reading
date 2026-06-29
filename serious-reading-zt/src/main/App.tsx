@@ -122,16 +122,16 @@ export default function App() {
     launchReader(sb, book)
   }
 
-  function launchReader(sb: ShelfBook, book: ParsedBook) {
-    const prog = getProgress(sb.path)
+  function launchReader(sb: ShelfBook, book: ParsedBook, skipTo?: { chapterIndex: number; charOffset?: number }) {
+    const prog = skipTo ? null : getProgress(sb.path)
     const state: any = {
       filePath: sb.path,
       format: sb.type,
       settings: getSettings(),
-      chapterIndex: prog?.chapterIndex ?? 0,
-      pageIndex: prog?.pageIndex ?? 0,
-      charOffset: prog?.charOffset,
-      pdfPage: prog?.chapterIndex,
+      chapterIndex: skipTo?.chapterIndex ?? prog?.chapterIndex ?? 0,
+      pageIndex: skipTo ? 0 : (prog?.pageIndex ?? 0),
+      charOffset: skipTo?.charOffset ?? prog?.charOffset,
+      pdfPage: skipTo?.chapterIndex ?? prog?.chapterIndex,
     }
     zt_hide()
     window.services?.createReaderWindow(state)
@@ -254,7 +254,7 @@ export default function App() {
     b.lastChapter = chapterIndex
     b.progress = charOffset
     const book = parsedRef.current[b.path]
-    if (book) launchReader(b, book)
+    if (book) launchReader(b, book, { chapterIndex, charOffset })
   }
 
   function pickFile() {

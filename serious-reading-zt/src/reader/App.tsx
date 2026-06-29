@@ -20,8 +20,7 @@ export default function App() {
   // 分页
   const [pages, setPages] = useState<string[]>(['<p style="padding-top:40vh;text-align:center;opacity:.4">正在加载…</p>'])
   const measureRef = useRef<HTMLDivElement>(null)
-  const [showNav, setShowNav] = useState(false)
-  const [navQ, setNavQ] = useState('')
+  const [dragWin, setDragWin] = useState<{ sx: number; sy: number } | null>(null)
 
   const ipc = (window as any)._ipcRenderer
   const sendParent = (window as any)._sendToParent as ((c: string, d?: any) => void) | undefined
@@ -85,8 +84,8 @@ export default function App() {
     if (!book || book.format === 'pdf' || !chapterHtml) return
     const measure = measureRef.current
     if (!measure) return
-    const pageH = window.innerHeight - 88
-    const pageW = window.innerWidth - 80
+    const pageH = window.innerHeight - 16
+    const pageW = window.innerWidth - 16
     measure.style.width = pageW + 'px'
     measure.style.fontSize = settings.reader.fontSize + 'px'
     measure.style.lineHeight = String(settings.reader.lineHeight)
@@ -126,14 +125,6 @@ export default function App() {
     if (book.fullText) return ((charOffset / book.fullText.length) * 100)
     return book.totalChapters ? ((chapterIdx + 1) / book.totalChapters) * 100 : 0
   }, [book, charOffset, chapterIdx, pdfPage, pdfTotal])
-
-  /* ---- 章节搜索过滤（导航面板用） ---- */
-  const filteredChapters = useMemo(() => {
-    if (!book || book.format === 'pdf') return []
-    const q = navQ.trim().toLowerCase()
-    if (!q) return book.chapters
-    return book.chapters.filter((c) => c.title.toLowerCase().includes(q) || String(c.index + 1).includes(q))
-  }, [book, navQ])
 
   /* ---- 翻页 ---- */
   const nextPage = useCallback(() => {
@@ -272,6 +263,21 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.autoPage, nextPage, stealth])
 
+  /* ---- 中间区域拖动移动窗口 ---- */
+  useEffect(() => {
+    if (!dragWin) return
+    const onMove = (e: MouseEvent) => {
+      sendParent?.('sr:win-delta', { type: 'move', dx: e.screenX - dragWin.sx, dy: e.screenY - dragWin.sy })
+    }
+    const onUp = () => {
+      sendParent?.('sr:win-end')
+      setDragWin(null)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+  }, [dragWin, sendParent])
+
   /* ---- resize 重排 ---- */
   useEffect(() => {
     const onRes = () => setResizeN((n) => n + 1)
@@ -325,7 +331,7 @@ export default function App() {
 
       {/* 内容区：整窗无 drag region，右键/中键/双击/滚轮/翻页全部正常 */}
       <div
-        className="absolute inset-0 overflow-hidden pt-5 select-none"
+        className="absolute inset-0 overflow-hidden select-none"
         onCopy={(e) => e.preventDefault()}
       >
         {/* 测量容器 */}
@@ -346,20 +352,27 @@ export default function App() {
               {pages.map((p, i) => (
                 <div
                   key={i}
-                  className="absolute left-0 top-0 h-full overflow-y-auto px-10 py-8 select-none"
+                  className="absolute left-0 top-0 h-full overflow-y-auto px-3 py-2 select-none"
                   style={{ width: '100%', left: `${i * 100}%` }}
                   dangerouslySetInnerHTML={{ __html: p }}
                 />
               ))}
             </div>
 
-            {/* 翻页点击区 */}
-            {settings.page.click && !stealth && (
+            {/* 翻页点击区（左右各 30%）+ 中间拖动移动区（40%） */}
+            {settings.page.click && !stealth ? (
               <>
                 <button className="absolute top-0 left-0 h-full" style={{ width: '30vw' }} onClick={prevPage} />
                 <button className="absolute top-0 right-0 h-full" style={{ width: '30vw' }} onClick={nextPage} />
+                <div className="absolute top-0 h-full cursor-move" style={{ left: '30vw', width: '40vw' }}
+                  onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); sendParent?.('sr:win-start', { type: 'move' }); setDragWin({ sx: e.screenX, sy: e.screenY }) } }}
+                />
               </>
-            )}
+            ) : !stealth ? (
+              <div className="absolute inset-0 cursor-move"
+                onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); sendParent?.('sr:win-start', { type: 'move' }); setDragWin({ sx: e.screenX, sy: e.screenY }) } }}
+              />
+            ) : null}
 
             {/* 进度条 */}
             {!stealth && (
@@ -370,89 +383,6 @@ export default function App() {
           </>
         )}
 
-        {/* 章节导航 + 搜索 + 百分比跳转（底部左侧触发，面板浮在内容上） */}
-        {!stealth && (
-          <>
-            {/* 触发条：左下显示当前章节，点击展开面板 */}
-            <button
-              className="absolute bottom-1 left-2 flex items-center gap-1 rounded px-1.5 text-[10px] opacity-70 hover:opacity-100"
-              style={{ color: settings.reader.textColor }}
-              onClick={() => { setShowNav((v) => !v); setNavQ('') }}
-              title="章节目录 / 搜索 / 跳转"
-            >
-              {book && book.format !== 'pdf'
-                ? `${chapterIdx + 1}/${book.totalChapters} · ${
-                    book.chapters[chapterIdx]?.title ?? ''
-                  }`
-                : `页 ${pdfPage}${pdfTotal ? '/' + pdfTotal : ''}`}
-            </button>
-
-            {/* 面板 */}
-            {showNav && (
-              <div
-                className="absolute bottom-7 left-2 z-[55] w-64 max-h-[60%] overflow-hidden rounded-md border border-black/10 bg-white/95 shadow-lg dark:border-white/10 dark:bg-neutral-900/95"
-                style={{ color: settings.reader.textColor }}
-              >
-                {/* 搜索 + 百分比 */}
-                <div className="flex items-center gap-1 border-b border-black/10 p-1.5 dark:border-white/10">
-                  <input
-                    value={navQ}
-                    onChange={(e) => setNavQ(e.target.value)}
-                    placeholder={book?.format === 'pdf' ? '搜索 PDF 不适用' : '搜章节标题'}
-                    className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-40"
-                  />
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      const el = e.currentTarget['p'] as HTMLInputElement
-                      const v = parseFloat(el.value)
-                      if (!isNaN(v)) jumpPercent(Math.max(0, Math.min(100, v)))
-                      el.value = ''
-                      el.blur()
-                      setShowNav(false)
-                    }}
-                    className="flex items-center"
-                  >
-                    <input
-                      name="p"
-                      type="number"
-                      step="0.01"
-                      placeholder={percent.toFixed(1)}
-                      className="w-10 bg-transparent text-right text-xs outline-none placeholder:opacity-40"
-                    />
-                    <span className="text-[10px] opacity-60">%</span>
-                  </form>
-                </div>
-
-                {/* 章节列表（PDF 时隐藏） */}
-                {book && book.format !== 'pdf' ? (
-                  <div className="max-h-48 overflow-y-auto py-0.5">
-                    {filteredChapters.length === 0 && (
-                      <div className="px-2 py-2 text-center text-[11px] opacity-40">无匹配章节</div>
-                    )}
-                    {filteredChapters.map((c) => {
-                      const idx = book.chapters.indexOf(c)
-                      return (
-                        <button
-                          key={`${idx}-${c.title}`}
-                          className={`block w-full truncate px-2.5 py-1 text-left text-xs hover:bg-black/5 dark:hover:bg-white/10 ${
-                            idx === chapterIdx ? 'font-bold' : ''
-                          }`}
-                          onClick={() => { goChapter(idx); setShowNav(false) }}
-                          title={c.title}
-                        >
-                          {c.title}
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="px-2 py-2 text-center text-[11px] opacity-40">PDF 模式请用 % 跳页</div>
-                )}
-              </div>
-            )}
-          </>
-        )}
       </div>
     </div>
   )
@@ -492,9 +422,7 @@ function WindowHandles({ sendParent }: { sendParent?: (c: string, d?: any) => vo
   }
 
   const handles = [
-    // 移动：顶部条
-    { type: 'move', cls: 'left-0 right-0 top-0 z-50 h-5 cursor-move bg-black/[0.03] hover:bg-black/10 dark:bg-white/[0.03] dark:hover:bg-white/10' },
-    // 缩放：四边/四角，全部放在窗口内并置于最上层（z-[60] 高于移动条）
+    // 缩放：四边/四角，全部放在窗口内并置于最上层
     { type: 'w', cls: 'left-0 top-0 bottom-0 w-1.5 z-[60] cursor-ew-resize' },
     { type: 'e', cls: 'right-0 top-0 bottom-0 w-1.5 z-[60] cursor-ew-resize' },
     { type: 's', cls: 'left-0 right-0 bottom-0 h-1.5 z-[60] cursor-ns-resize' },

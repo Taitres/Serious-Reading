@@ -299,7 +299,7 @@ ipcRenderer.on('sr:win-delta', function (e, data) {
     if (type.includes('w')) { width = b.width - dx; x = b.x + dx }
     if (type.includes('s')) height = b.height + dy
     if (type.includes('n')) { height = b.height - dy; y = b.y + dy }
-    const MINW = 260, MINH = 200
+    const MINW = 140, MINH = 100
     if (width < MINW) { if (type.includes('w')) x = b.x + b.width - MINW; width = MINW }
     if (height < MINH) { if (type.includes('n')) y = b.y + b.height - MINH; height = MINH }
   }
